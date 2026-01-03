@@ -5,7 +5,7 @@ import { readFileContent } from '../utils/fileReader';
 const createAiClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === "undefined" || apiKey === "") {
-    throw new Error("API_KEY chưa được cấu hình trên hệ thống.");
+    throw new Error("API_KEY chưa được cấu hình trên hệ thống Vercel.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -13,13 +13,15 @@ const createAiClient = () => {
 const safeJsonParse = (text: string | undefined) => {
   if (!text) throw new Error("AI không phản hồi dữ liệu.");
   let clean = text.trim();
+  // Loại bỏ markdown code blocks nếu có
   const match = clean.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (match) clean = match[1].trim();
   
   try {
     return JSON.parse(clean);
   } catch (e) {
-    throw new Error("Lỗi định dạng dữ liệu từ AI.");
+    console.error("JSON Parse Error. Original text:", text);
+    throw new Error("Lỗi định dạng dữ liệu từ AI. Vui lòng thử lại.");
   }
 };
 
@@ -73,9 +75,11 @@ export const checkVietnameseSpelling = async (file: File, contractName: string):
 export const evaluateContractLegality = async (file: File, contractName: string): Promise<LegalEvaluationResult> => {
   const text = await readFileContent(file);
   const ai = createAiClient();
+  // Sử dụng Flash cho nhanh và ổn định hơn Pro trong môi trường web
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: `Bạn là luật sư chuyên gia. Phân tích rủi ro pháp lý và lỗ hổng hợp đồng cho: ${contractName} dựa trên Bộ luật Dân sự 2015 và các văn bản luật liên quan mới nhất. Đưa ra khuyến nghị chi tiết.\n\nNội dung:\n${text}`,
+    model: 'gemini-3-flash-preview',
+    contents: `Bạn là luật sư chuyên gia cấp cao tại Việt Nam. Phân tích rủi ro pháp lý cho: ${contractName}. 
+    CHỈ ĐƯỢC PHÉP TRẢ VỀ loại lỗi là: 'suggestion', 'warning', hoặc 'critical'.\n\nNội dung văn bản:\n${text}`,
     config: { 
       tools: [{googleSearch: {}}],
       responseMimeType: "application/json",
@@ -88,7 +92,10 @@ export const evaluateContractLegality = async (file: File, contractName: string)
             items: {
               type: Type.OBJECT,
               properties: {
-                type: { type: Type.STRING },
+                type: { 
+                  type: Type.STRING, 
+                  description: "Chỉ được dùng: suggestion, warning, critical" 
+                },
                 clause: { type: Type.STRING },
                 comment: { type: Type.STRING },
                 recommendation: { type: Type.STRING }
