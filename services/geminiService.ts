@@ -4,14 +4,12 @@ import { readFileContent } from '../utils/fileReader';
 
 /**
  * Khởi tạo AI Client.
- * API Key được lấy trực tiếp từ process.env.API_KEY theo quy định.
+ * API Key được lấy trực tiếp từ process.env.API_KEY theo quy định của SDK.
  */
 const createAiClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key chưa được thiết lập. Vui lòng bấm vào nút 'Chọn API Key' nếu bạn đang ở môi trường Preview.");
-  }
-  return new GoogleGenAI({ apiKey });
+  // Trong môi trường trình duyệt của AI Studio, process.env.API_KEY sẽ được chèn tự động khi build.
+  return new GoogleGenAI({ apiKey: apiKey as string });
 };
 
 const safeJsonParse = (text: string | undefined) => {

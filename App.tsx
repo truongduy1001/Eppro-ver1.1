@@ -21,8 +21,8 @@ declare global {
   }
 
   interface Window {
-    /* Fix: Remove 'readonly' modifier to match ambient declaration requirements and prevent "identical modifiers" error */
-    aistudio: AIStudio;
+    /* Fix: Restore 'readonly' modifier to match ambient declaration requirements and resolve "identical modifiers" error */
+    readonly aistudio: AIStudio;
   }
 }
 
