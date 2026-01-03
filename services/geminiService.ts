@@ -2,15 +2,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, ComparisonResult, OcrResult } from '../types';
 import { readFileContent } from '../utils/fileReader';
 
-/**
- * Khởi tạo AI Client mới cho mỗi yêu cầu.
- * Điều này đảm bảo Key được người dùng chọn qua window.aistudio.openSelectKey() 
- * sẽ được áp dụng ngay lập tức mà không cần tải lại trang.
- */
 const createAiClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === "__API_KEY__" || apiKey === "undefined" || apiKey === "") {
-    throw new Error("An API Key must be set. Vui lòng sử dụng nút 'Chọn API Key' phía trên.");
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    throw new Error("API_KEY chưa được cấu hình trên hệ thống.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -24,8 +19,7 @@ const safeJsonParse = (text: string | undefined) => {
   try {
     return JSON.parse(clean);
   } catch (e) {
-    console.error("Lỗi Parse JSON:", clean);
-    throw new Error("Dữ liệu phản hồi từ AI không đúng định dạng JSON.");
+    throw new Error("Lỗi định dạng dữ liệu từ AI.");
   }
 };
 
@@ -117,13 +111,13 @@ export const getContractDetails = async (contractName: string): Promise<Contract
   const ai = createAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Cung cấp chi tiết các quy định pháp luật hiện hành và các điều khoản mẫu bắt buộc cho: ${contractName}. Đảm bảo các thông tin cập nhật đến năm 2024-2025.`,
+    contents: `Cung cấp chi tiết các quy định pháp luật hiện hành và các điều khoản mẫu bắt buộc cho: ${contractName}.`,
     config: {
       tools: [{googleSearch: {}}]
     }
   });
   return { 
-    details: response.text || "Không có dữ liệu chi tiết.",
+    details: response.text || "Không có dữ liệu.",
     sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks
   };
 };
@@ -134,34 +128,13 @@ export const compareDocuments = async (file1: File, file2: File): Promise<Compar
   const ai = createAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `So sánh hai văn bản sau để tìm điểm tương đồng và khác biệt chính về nội dung pháp lý:\n\nVăn bản 1: ${text1}\n\nVăn bản 2: ${text2}`,
+    contents: `So sánh hai văn bản sau:\n\nVăn bản 1: ${text1}\n\nVăn bản 2: ${text2}`,
     config: { 
       tools: [{googleSearch: {}}],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          similarityScore: { type: Type.NUMBER },
-          matches: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                textFromFile1: { type: Type.STRING },
-                textFromFile2: { type: Type.STRING }
-              }
-            }
-          }
-        }
-      }
+      responseMimeType: "application/json"
     }
   });
-  
-  const result = safeJsonParse(response.text);
-  return {
-    ...result,
-    sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks
-  };
+  return safeJsonParse(response.text);
 };
 
 export const performOcr = async (file: File): Promise<OcrResult> => {
