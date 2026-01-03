@@ -27,18 +27,34 @@ type ActiveTab = 'analyze' | 'compare' | 'ocr';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('analyze');
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true); 
+  
+  // Kiểm tra xem Key có sẵn trong Environment Variables không
+  const isEnvKeyValid = () => {
+    const key = process.env.API_KEY;
+    return !!key && key !== "__API_KEY__" && key !== "undefined" && key !== "";
+  };
+
+  const [hasApiKey, setHasApiKey] = useState<boolean>(isEnvKeyValid()); 
 
   // Kiểm tra trạng thái API Key khi ứng dụng khởi chạy
   useEffect(() => {
     const checkKeyStatus = async () => {
+      // Nếu đã có Env Key thì không cần check aistudio nữa
+      if (isEnvKeyValid()) {
+        setHasApiKey(true);
+        return;
+      }
+
       try {
         if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
           const selected = await window.aistudio.hasSelectedApiKey();
           setHasApiKey(selected);
+        } else {
+          // Nếu không có Env Key và cũng không có aistudio, thì báo chưa có key
+          setHasApiKey(false);
         }
       } catch (e) {
-        console.warn("Môi trường không hỗ trợ aistudio check.");
+        setHasApiKey(false);
       }
     };
     checkKeyStatus();
@@ -49,13 +65,12 @@ const App: React.FC = () => {
     if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
       try {
         await window.aistudio.openSelectKey();
-        // Giả định chọn thành công theo hướng dẫn SDK để tránh race condition
         setHasApiKey(true);
       } catch (e) {
         alert("Lỗi khi mở hộp thoại chọn Key: " + (e instanceof Error ? e.message : String(e)));
       }
     } else {
-      alert("⚠️ Tính năng này chỉ hoạt động trong môi trường Google AI Studio. Nếu bạn đang chạy trên Vercel/Local, vui lòng đảm bảo API_KEY đã được cấu hình trong Environment Variables.");
+      alert("⚠️ Ứng dụng không tìm thấy API_KEY trong cấu hình Vercel.\nHướng dẫn: Bạn cần thêm biến API_KEY (không phải VITE_API_KEY) vào Vercel Project Settings > Environment Variables và Re-deploy.");
     }
   };
 
@@ -81,7 +96,7 @@ const App: React.FC = () => {
 
     if (isKeyError) {
       setHasApiKey(false);
-      setter("Lỗi: API Key chưa được xác thực hoặc không hợp lệ. Vui lòng bấm nút 'CHỌN API KEY' phía trên.");
+      setter("Lỗi: API Key không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại cấu hình Environment Variables trên Vercel.");
     } else {
       setter(`Lỗi: ${msg}`);
     }
@@ -157,7 +172,7 @@ const App: React.FC = () => {
         </header>
 
         <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden mb-8">
-          {/* Thông báo API Key với sự kiện click chắc chắn */}
+          {/* Chỉ hiện thông báo nếu KHÔNG có Env Key và KHÔNG có aistudio key */}
           {!hasApiKey && (
             <div className="bg-gradient-to-r from-red-900/40 via-amber-900/50 to-red-900/40 border-b border-amber-700/50 p-6 text-center">
               <div className="flex flex-col items-center space-y-4">
@@ -172,7 +187,7 @@ const App: React.FC = () => {
                   BẤM VÀO ĐÂY ĐỂ CHỌN API KEY
                 </button>
                 <p className="text-sm text-amber-200/60 max-w-md">
-                  (Vui lòng chọn một API Key từ dự án Google Cloud đã được kích hoạt thanh toán)
+                  (Nếu bạn dùng Vercel, hãy cấu hình API_KEY trong Settings và Re-deploy)
                 </p>
               </div>
             </div>
