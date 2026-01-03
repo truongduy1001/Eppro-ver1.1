@@ -3,15 +3,15 @@ import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, Comparis
 import { readFileContent } from '../utils/fileReader';
 
 /**
- * Khởi tạo AI Client.
- * API Key được lấy trực tiếp từ process.env.API_KEY được nền tảng chèn tự động.
+ * Khởi tạo AI Client mới cho mỗi yêu cầu.
+ * Điều này đảm bảo Key được người dùng chọn qua window.aistudio.openSelectKey() 
+ * sẽ được áp dụng ngay lập tức mà không cần tải lại trang.
  */
 const createAiClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === "__API_KEY__" || apiKey === "undefined") {
-    throw new Error("API Key chưa được thiết lập. Vui lòng sử dụng nút 'Chọn API Key' phía trên.");
+  if (!apiKey || apiKey === "__API_KEY__" || apiKey === "undefined" || apiKey === "") {
+    throw new Error("An API Key must be set. Vui lòng sử dụng nút 'Chọn API Key' phía trên.");
   }
-  // Khởi tạo instance mới mỗi lần gọi để đảm bảo sử dụng key vừa được chọn
   return new GoogleGenAI({ apiKey });
 };
 

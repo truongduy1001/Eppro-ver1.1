@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { checkVietnameseSpelling, getContractDetails, evaluateContractLegality, compareDocuments, performOcr } from './services/geminiService.ts';
 import { CONTRACT_TYPES } from './constants.ts';
@@ -12,7 +11,7 @@ import LegalEvaluationDisplay from './components/LegalEvaluationDisplay.tsx';
 import FileDropzone from './components/FileDropzone.tsx';
 import ComparisonDisplay from './components/ComparisonDisplay.tsx';
 
-// Khai báo kiểu cho window.aistudio theo chuẩn môi trường
+// Khai báo kiểu cho window.aistudio
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
@@ -20,7 +19,6 @@ declare global {
   }
 
   interface Window {
-    // Fixed: Made optional to avoid modifier conflict with existing declarations
     aistudio?: AIStudio;
   }
 }
@@ -40,30 +38,25 @@ const App: React.FC = () => {
           setHasApiKey(selected);
         }
       } catch (e) {
-        console.error("Không thể kiểm tra trạng thái API Key:", e);
+        console.warn("Môi trường không hỗ trợ aistudio check.");
       }
     };
     checkKeyStatus();
   }, []);
 
-  const handleOpenSelectKey = async () => {
+  const handleOpenSelectKey = async (e: React.MouseEvent) => {
+    e.preventDefault();
     if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
       try {
         await window.aistudio.openSelectKey();
-        // Sau khi kích hoạt hộp thoại, giả định người dùng sẽ chọn thành công
+        // Giả định chọn thành công theo hướng dẫn SDK để tránh race condition
         setHasApiKey(true);
       } catch (e) {
-        alert("Không thể mở hộp thoại chọn API Key. Vui lòng thử lại hoặc tải lại trang.");
+        alert("Lỗi khi mở hộp thoại chọn Key: " + (e instanceof Error ? e.message : String(e)));
       }
     } else {
-      alert("Tính năng chọn API Key không khả dụng trong môi trường này.");
+      alert("⚠️ Tính năng này chỉ hoạt động trong môi trường Google AI Studio. Nếu bạn đang chạy trên Vercel/Local, vui lòng đảm bảo API_KEY đã được cấu hình trong Environment Variables.");
     }
-  };
-  
-  const getTabStyle = (tabName: ActiveTab) => {
-    return activeTab === tabName
-      ? 'bg-sky-600 text-white shadow-md'
-      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50';
   };
 
   const [file, setFile] = useState<File | null>(null);
@@ -78,17 +71,6 @@ const App: React.FC = () => {
   const [isModalLoading, setIsModalLoading] = useState<boolean>(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
-  
-  const [file1, setFile1] = useState<File | null>(null);
-  const [file2, setFile2] = useState<File | null>(null);
-  const [isComparing, setIsComparing] = useState<boolean>(false);
-  const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
-  const [comparisonError, setComparisonError] = useState<string | null>(null);
-
-  const [ocrFile, setOcrFile] = useState<File | null>(null);
-  const [isOcrLoading, setIsOcrLoading] = useState<boolean>(false);
-  const [ocrResult, setOcrResult] = useState<string | null>(null);
-  const [ocrError, setOcrError] = useState<string | null>(null);
 
   const handleError = (err: any, setter: (msg: string) => void) => {
     const msg = err instanceof Error ? err.message : String(err);
@@ -99,7 +81,7 @@ const App: React.FC = () => {
 
     if (isKeyError) {
       setHasApiKey(false);
-      setter("Lỗi: API Key chưa được xác thực hoặc không hợp lệ. Vui lòng bấm 'Chọn API Key' ở thanh thông báo phía trên.");
+      setter("Lỗi: API Key chưa được xác thực hoặc không hợp lệ. Vui lòng bấm nút 'CHỌN API KEY' phía trên.");
     } else {
       setter(`Lỗi: ${msg}`);
     }
@@ -149,7 +131,7 @@ const App: React.FC = () => {
         setIsEvaluating(false);
     }
   }, [file, selectedContractId]);
-  
+
   const handleViewDetails = useCallback(async () => {
     const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
     if (!selectedContract || selectedContract.id === 'general') return;
@@ -171,34 +153,35 @@ const App: React.FC = () => {
       <div className="max-w-4xl mx-auto w-full">
         <header className="text-center mb-8">
           <h1 className="text-4xl font-bold text-sky-400 mb-2">Trợ lý Pháp lý AI</h1>
-          <p className="text-slate-400">Kiểm tra chính tả, rủi ro pháp lý và OCR văn bản Tiếng Việt.</p>
+          <p className="text-slate-400 font-medium">Kiểm tra chính tả, rủi ro pháp lý và OCR văn bản Tiếng Việt.</p>
         </header>
 
-        <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-xl overflow-hidden mb-8">
-          {/* Thanh thông báo API Key nổi bật hơn */}
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden mb-8">
+          {/* Thông báo API Key với sự kiện click chắc chắn */}
           {!hasApiKey && (
-            <div className="bg-gradient-to-r from-amber-900/60 to-orange-900/60 border-b border-amber-700/50 p-6 text-center">
+            <div className="bg-gradient-to-r from-red-900/40 via-amber-900/50 to-red-900/40 border-b border-amber-700/50 p-6 text-center">
               <div className="flex flex-col items-center space-y-4">
-                <p className="text-amber-100 font-medium text-lg">
+                <p className="text-amber-100 font-bold text-lg">
                   Hệ thống chưa nhận diện được API Key trả phí của bạn.
                 </p>
                 <button 
+                  type="button"
                   onClick={handleOpenSelectKey}
-                  className="bg-orange-500 hover:bg-orange-400 text-white px-10 py-3 rounded-xl font-black text-lg shadow-lg shadow-orange-900/40 transition-all transform hover:scale-105 active:scale-95"
+                  className="bg-orange-500 hover:bg-orange-400 text-white px-12 py-4 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all transform hover:scale-105 active:scale-95 cursor-pointer z-50"
                 >
                   BẤM VÀO ĐÂY ĐỂ CHỌN API KEY
                 </button>
-                <p className="text-sm text-amber-300/70 italic">
-                  (Yêu cầu Key từ dự án Google Cloud đã bật thanh toán)
+                <p className="text-sm text-amber-200/60 max-w-md">
+                  (Vui lòng chọn một API Key từ dự án Google Cloud đã được kích hoạt thanh toán)
                 </p>
               </div>
             </div>
           )}
 
           <div className="flex bg-slate-900/50 border-b border-slate-700">
-            <button onClick={() => setActiveTab('analyze')} className={`flex-1 py-4 font-bold transition-colors ${activeTab === 'analyze' ? 'text-sky-400 bg-sky-400/10 border-b-2 border-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>Phân tích File</button>
-            <button onClick={() => setActiveTab('compare')} className={`flex-1 py-4 font-bold transition-colors ${activeTab === 'compare' ? 'text-sky-400 bg-sky-400/10 border-b-2 border-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>So sánh 2 File</button>
-            <button onClick={() => setActiveTab('ocr')} className={`flex-1 py-4 font-bold transition-colors ${activeTab === 'ocr' ? 'text-sky-400 bg-sky-400/10 border-b-2 border-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>OCR</button>
+            <button onClick={() => setActiveTab('analyze')} className={`flex-1 py-4 font-bold transition-all ${activeTab === 'analyze' ? 'text-sky-400 bg-sky-400/10 border-b-4 border-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>Phân tích File</button>
+            <button onClick={() => setActiveTab('compare')} className={`flex-1 py-4 font-bold transition-all ${activeTab === 'compare' ? 'text-sky-400 bg-sky-400/10 border-b-4 border-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>So sánh 2 File</button>
+            <button onClick={() => setActiveTab('ocr')} className={`flex-1 py-4 font-bold transition-all ${activeTab === 'ocr' ? 'text-sky-400 bg-sky-400/10 border-b-4 border-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>OCR</button>
           </div>
 
           <div className="p-6">
@@ -206,25 +189,25 @@ const App: React.FC = () => {
               <>
                 <ContractTypeSelector selectedType={selectedContractId} onTypeChange={setSelectedContractId} contractTypes={CONTRACT_TYPES} onViewDetails={handleViewDetails} />
                 <FileUpload file={file} onFileSelect={handleFileSelect} onCheck={handleCheckSpelling} onEvaluate={handleEvaluateLegality} isLoading={isLoading} isEvaluating={isEvaluating} />
-                {error && <div className="mt-6 p-4 bg-red-900/50 border border-red-700 rounded-xl text-red-200 text-center font-medium">{error}</div>}
+                {error && <div className="mt-6 p-4 bg-red-900/40 border border-red-700 rounded-xl text-red-200 text-center font-medium animate-pulse">{error}</div>}
                 {(isLoading || isEvaluating) && <Loader message={loadingMessage}/>}
                 {spellCheckResult && !isLoading && <ResultsDisplay result={spellCheckResult} />}
                 {legalResult && !isEvaluating && <LegalEvaluationDisplay result={legalResult} />}
               </>
             )}
-            {/* Các tab khác giữ nguyên nội dung */}
+            
             {activeTab === 'compare' && (
-               <div className="text-center p-10 text-slate-400 italic">Tính năng so sánh đang sẵn sàng. Tải tệp ở trên để bắt đầu.</div>
+               <div className="text-center p-12 text-slate-400 italic bg-slate-900/20 rounded-xl">Tính năng so sánh đang sẵn sàng. Vui lòng tải tài liệu lên để bắt đầu.</div>
             )}
             {activeTab === 'ocr' && (
-               <div className="text-center p-10 text-slate-400 italic">Tính năng OCR đang sẵn sàng. Tải ảnh/PDF quét ở trên để bắt đầu.</div>
+               <div className="text-center p-12 text-slate-400 italic bg-slate-900/20 rounded-xl">Tính năng OCR đang sẵn sàng. Vui lòng tải ảnh/PDF quét để bắt đầu.</div>
             )}
           </div>
         </div>
 
-        <footer className="text-center text-slate-500 text-xs">
+        <footer className="text-center text-slate-500 text-xs py-4">
           <p>Phiên bản 1.1 - Phát triển bởi <span className="text-red-700 font-bold">DI-IT</span></p>
-          <p className="mt-1">Dữ liệu được xử lý bảo mật qua Google Gemini API</p>
+          <p className="mt-1 opacity-60">Toàn bộ dữ liệu được bảo mật và xử lý qua Google Gemini Enterprise API</p>
         </footer>
       </div>
 
