@@ -1,15 +1,13 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { checkVietnameseSpelling, getContractDetails, evaluateContractLegality, compareDocuments, performOcr } from './services/geminiService.ts';
+import React, { useState, useCallback } from 'react';
+import { checkVietnameseSpelling, getContractDetails, evaluateContractLegality } from './services/geminiService.ts';
 import { CONTRACT_TYPES } from './constants.ts';
-import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, ComparisonResult } from './types.ts';
+import type { SpellCheckResult, ContractDetails, LegalEvaluationResult } from './types.ts';
 import FileUpload from './components/FileUpload.tsx';
 import ResultsDisplay from './components/ResultsDisplay.tsx';
 import Loader from './components/Loader.tsx';
 import ContractTypeSelector from './components/ContractTypeSelector.tsx';
 import ContractDetailsModal from './components/ContractDetailsModal.tsx';
 import LegalEvaluationDisplay from './components/LegalEvaluationDisplay.tsx';
-import FileDropzone from './components/FileDropzone.tsx';
-import ComparisonDisplay from './components/ComparisonDisplay.tsx';
 
 // Khai báo kiểu cho window.aistudio
 declare global {
@@ -17,7 +15,6 @@ declare global {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
-
   interface Window {
     aistudio?: AIStudio;
   }
@@ -27,53 +24,7 @@ type ActiveTab = 'analyze' | 'compare' | 'ocr';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('analyze');
-  
-  // Kiểm tra xem Key có sẵn trong Environment Variables không
-  const isEnvKeyValid = () => {
-    const key = process.env.API_KEY;
-    return !!key && key !== "__API_KEY__" && key !== "undefined" && key !== "";
-  };
-
-  const [hasApiKey, setHasApiKey] = useState<boolean>(isEnvKeyValid()); 
-
-  // Kiểm tra trạng thái API Key khi ứng dụng khởi chạy
-  useEffect(() => {
-    const checkKeyStatus = async () => {
-      // Nếu đã có Env Key thì không cần check aistudio nữa
-      if (isEnvKeyValid()) {
-        setHasApiKey(true);
-        return;
-      }
-
-      try {
-        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-          const selected = await window.aistudio.hasSelectedApiKey();
-          setHasApiKey(selected);
-        } else {
-          // Nếu không có Env Key và cũng không có aistudio, thì báo chưa có key
-          setHasApiKey(false);
-        }
-      } catch (e) {
-        setHasApiKey(false);
-      }
-    };
-    checkKeyStatus();
-  }, []);
-
-  const handleOpenSelectKey = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-      try {
-        await window.aistudio.openSelectKey();
-        setHasApiKey(true);
-      } catch (e) {
-        alert("Lỗi khi mở hộp thoại chọn Key: " + (e instanceof Error ? e.message : String(e)));
-      }
-    } else {
-      alert("⚠️ Ứng dụng không tìm thấy API_KEY trong cấu hình Vercel.\nHướng dẫn: Bạn cần thêm biến API_KEY (không phải VITE_API_KEY) vào Vercel Project Settings > Environment Variables và Re-deploy.");
-    }
-  };
-
+  const [showKeyAlert, setShowKeyAlert] = useState<boolean>(false);
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
@@ -85,20 +36,31 @@ const App: React.FC = () => {
   const [modalContent, setModalContent] = useState<ContractDetails | null>(null);
   const [isModalLoading, setIsModalLoading] = useState<boolean>(false);
   const [modalError, setModalError] = useState<string | null>(null);
-  const [loadingMessage, setLoadingMessage] = useState<string>('');
 
   const handleError = (err: any, setter: (msg: string) => void) => {
     const msg = err instanceof Error ? err.message : String(err);
+    // Kiểm tra các lỗi liên quan đến API Key
     const isKeyError = msg.toLowerCase().includes("api key") || 
                        msg.toLowerCase().includes("unauthorized") || 
-                       msg.toLowerCase().includes("not be set") ||
-                       msg.toLowerCase().includes("requested entity was not found");
+                       msg.toLowerCase().includes("not found") ||
+                       msg.toLowerCase().includes("401") ||
+                       msg.toLowerCase().includes("403");
 
     if (isKeyError) {
-      setHasApiKey(false);
-      setter("Lỗi: API Key không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại cấu hình Environment Variables trên Vercel.");
+      setShowKeyAlert(true);
+      setter("Lỗi: Không thể xác thực API Key. Nếu bạn đang dùng Vercel, hãy đảm bảo tên biến môi trường là API_KEY (không phải VITE_API_KEY).");
     } else {
       setter(`Lỗi: ${msg}`);
+    }
+  };
+
+  const handleOpenSelectKey = async () => {
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      setShowKeyAlert(false);
+      setError(null);
+    } else {
+      alert("Tính năng chọn Key chỉ khả dụng trong môi trường Google AI Studio. Trên Vercel, vui lòng kiểm tra lại phần Environment Variables.");
     }
   };
 
@@ -115,7 +77,6 @@ const App: React.FC = () => {
       return;
     }
     setIsLoading(true);
-    setLoadingMessage('Đang phân tích chính tả...');
     setError(null);
     try {
       const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
@@ -134,7 +95,6 @@ const App: React.FC = () => {
       return;
     }
     setIsEvaluating(true);
-    setLoadingMessage('Đang phân tích rủi ro pháp lý...');
     setError(null);
     try {
         const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
@@ -172,24 +132,15 @@ const App: React.FC = () => {
         </header>
 
         <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden mb-8">
-          {/* Chỉ hiện thông báo nếu KHÔNG có Env Key và KHÔNG có aistudio key */}
-          {!hasApiKey && (
-            <div className="bg-gradient-to-r from-red-900/40 via-amber-900/50 to-red-900/40 border-b border-amber-700/50 p-6 text-center">
-              <div className="flex flex-col items-center space-y-4">
-                <p className="text-amber-100 font-bold text-lg">
-                  Hệ thống chưa nhận diện được API Key trả phí của bạn.
-                </p>
-                <button 
-                  type="button"
-                  onClick={handleOpenSelectKey}
-                  className="bg-orange-500 hover:bg-orange-400 text-white px-12 py-4 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all transform hover:scale-105 active:scale-95 cursor-pointer z-50"
-                >
-                  BẤM VÀO ĐÂY ĐỂ CHỌN API KEY
-                </button>
-                <p className="text-sm text-amber-200/60 max-w-md">
-                  (Nếu bạn dùng Vercel, hãy cấu hình API_KEY trong Settings và Re-deploy)
-                </p>
-              </div>
+          {showKeyAlert && (
+            <div className="bg-red-900/60 border-b border-red-700 p-6 text-center">
+              <p className="text-red-200 font-bold mb-4 italic">⚠️ LỖI XÁC THỰC: Hệ thống không đọc được API Key của bạn.</p>
+              <button 
+                onClick={handleOpenSelectKey}
+                className="bg-white text-red-900 px-8 py-3 rounded-xl font-black hover:bg-slate-200 transition-all shadow-lg"
+              >
+                THỬ CHỌN LẠI API KEY
+              </button>
             </div>
           )}
 
@@ -205,24 +156,21 @@ const App: React.FC = () => {
                 <ContractTypeSelector selectedType={selectedContractId} onTypeChange={setSelectedContractId} contractTypes={CONTRACT_TYPES} onViewDetails={handleViewDetails} />
                 <FileUpload file={file} onFileSelect={handleFileSelect} onCheck={handleCheckSpelling} onEvaluate={handleEvaluateLegality} isLoading={isLoading} isEvaluating={isEvaluating} />
                 {error && <div className="mt-6 p-4 bg-red-900/40 border border-red-700 rounded-xl text-red-200 text-center font-medium animate-pulse">{error}</div>}
-                {(isLoading || isEvaluating) && <Loader message={loadingMessage}/>}
+                {(isLoading || isEvaluating) && <Loader message={isLoading ? "Đang kiểm tra chính tả..." : "Đang phân tích pháp lý..."}/>}
                 {spellCheckResult && !isLoading && <ResultsDisplay result={spellCheckResult} />}
                 {legalResult && !isEvaluating && <LegalEvaluationDisplay result={legalResult} />}
               </>
             )}
             
-            {activeTab === 'compare' && (
-               <div className="text-center p-12 text-slate-400 italic bg-slate-900/20 rounded-xl">Tính năng so sánh đang sẵn sàng. Vui lòng tải tài liệu lên để bắt đầu.</div>
-            )}
-            {activeTab === 'ocr' && (
-               <div className="text-center p-12 text-slate-400 italic bg-slate-900/20 rounded-xl">Tính năng OCR đang sẵn sàng. Vui lòng tải ảnh/PDF quét để bắt đầu.</div>
+            {(activeTab === 'compare' || activeTab === 'ocr') && (
+               <div className="text-center p-12 text-slate-400 italic bg-slate-900/20 rounded-xl">Tính năng này đang được tối ưu hóa. Vui lòng quay lại sau.</div>
             )}
           </div>
         </div>
 
         <footer className="text-center text-slate-500 text-xs py-4">
           <p>Phiên bản 1.1 - Phát triển bởi <span className="text-red-700 font-bold">DI-IT</span></p>
-          <p className="mt-1 opacity-60">Toàn bộ dữ liệu được bảo mật và xử lý qua Google Gemini Enterprise API</p>
+          <p className="mt-1 opacity-60">Dữ liệu được xử lý bảo mật qua Google Gemini API</p>
         </footer>
       </div>
 
