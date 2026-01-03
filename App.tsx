@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { checkVietnameseSpelling, getContractDetails, evaluateContractLegality, compareDocuments, performOcr } from './services/geminiService.ts';
 import { CONTRACT_TYPES } from './constants.ts';
 import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, ComparisonResult } from './types.ts';
@@ -12,10 +12,43 @@ import LegalEvaluationDisplay from './components/LegalEvaluationDisplay.tsx';
 import FileDropzone from './components/FileDropzone.tsx';
 import ComparisonDisplay from './components/ComparisonDisplay.tsx';
 
+// Khai báo kiểu cho window.aistudio
+declare global {
+  /* Fix: Explicitly define AIStudio interface to ensure compatibility with environmental types */
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
+  interface Window {
+    /* Fix: Remove 'readonly' modifier to match ambient declaration requirements and prevent "identical modifiers" error */
+    aistudio: AIStudio;
+  }
+}
+
 type ActiveTab = 'analyze' | 'compare' | 'ocr';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('analyze');
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Giả định là có cho đến khi kiểm tra
+
+  // Kiểm tra API Key khi khởi chạy
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const selected = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(selected);
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleOpenSelectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true); // Giả định thành công sau khi mở hộp thoại
+    }
+  };
   
   // === TABS STYLES ===
   const getTabStyle = (tabName: ActiveTab) => {
@@ -51,6 +84,15 @@ const App: React.FC = () => {
   const [ocrResult, setOcrResult] = useState<string | null>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
 
+  const handleError = (err: any, setter: (msg: string) => void) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Requested entity was not found") || msg.includes("API Key")) {
+      setHasApiKey(false);
+      setter("Lỗi: API Key không hợp lệ hoặc chưa được cấu hình. Vui lòng chọn lại Key trả phí.");
+    } else {
+      setter(`Lỗi: ${msg}`);
+    }
+  };
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -68,18 +110,14 @@ const App: React.FC = () => {
     setLoadingMessage('Đang tải tệp lên và phân tích...');
     setError(null);
     setSpellCheckResult(null);
-    setLegalResult(null);
 
     try {
       const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
       const contractName = selectedContract ? selectedContract.name : CONTRACT_TYPES[0].name;
-      
       const result = await checkVietnameseSpelling(file, contractName);
       setSpellCheckResult(result);
     } catch (err) {
-      console.error('Error during spell check process:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định. Vui lòng thử lại.';
-      setError(`Lỗi: ${errorMessage}`);
+      handleError(err, setError);
     } finally {
       setIsLoading(false);
       setLoadingMessage('');
@@ -92,21 +130,17 @@ const App: React.FC = () => {
       return;
     }
     setIsEvaluating(true);
-    setLoadingMessage('Đang tải tệp lên và phân tích...');
+    setLoadingMessage('Đang tải tệp lên và phân tích rủi ro...');
     setError(null);
-    setSpellCheckResult(null);
     setLegalResult(null);
 
     try {
         const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
         const contractName = selectedContract ? selectedContract.name : CONTRACT_TYPES[0].name;
-        
         const result = await evaluateContractLegality(file, contractName);
         setLegalResult(result);
     } catch (err) {
-        console.error('Error during legal evaluation:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định.';
-        setError(`Lỗi phân tích: ${errorMessage}`);
+        handleError(err, setError);
     } finally {
         setIsEvaluating(false);
         setLoadingMessage('');
@@ -126,8 +160,7 @@ const App: React.FC = () => {
       const details = await getContractDetails(selectedContract.name);
       setModalContent(details);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định.';
-      setModalError(`Không thể tải chi tiết hợp đồng: ${errorMessage}`);
+      handleError(err, setModalError);
     } finally {
       setIsModalLoading(false);
     }
@@ -145,15 +178,13 @@ const App: React.FC = () => {
       setComparisonError(null);
       setComparisonResult(null);
       setIsComparing(true);
-      setLoadingMessage("Đang tải tệp lên và so sánh...");
+      setLoadingMessage("Đang so sánh hai văn bản...");
       
       try {
         const result = await compareDocuments(file1, file2);
         setComparisonResult(result);
       } catch (err) {
-        console.error('Error during comparison:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định.';
-        setComparisonError(`Lỗi so sánh: ${errorMessage}`);
+        handleError(err, setComparisonError);
       } finally {
         setIsComparing(false);
         setLoadingMessage('');
@@ -168,20 +199,48 @@ const App: React.FC = () => {
       setOcrError(null);
       setOcrResult(null);
       setIsOcrLoading(true);
-      setLoadingMessage('Đang tải tệp lên và nhận dạng ký tự...');
+      setLoadingMessage('Đang thực hiện nhận dạng ký tự...');
 
       try {
           const result = await performOcr(ocrFile);
           setOcrResult(result.text);
       } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định.';
-          setOcrError(`Lỗi OCR: ${errorMessage}`);
+          handleError(err, setOcrError);
       } finally {
           setIsOcrLoading(false);
           setLoadingMessage('');
       }
   }, [ocrFile]);
 
+  if (!hasApiKey && window.aistudio) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
+        <div className="max-w-md w-full bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl text-center">
+          <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-4">Yêu cầu API Key</h2>
+          <p className="text-slate-400 mb-6">
+            Ứng dụng yêu cầu API Key trả phí từ Google Cloud để sử dụng các mô hình AI cao cấp. Vui lòng chọn Key của bạn để tiếp tục.
+          </p>
+          <button
+            onClick={handleOpenSelectKey}
+            className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg transition-colors mb-4"
+          >
+            Chọn API Key
+          </button>
+          <a 
+            href="https://ai.google.dev/gemini-api/docs/billing" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sky-400 hover:underline text-sm"
+          >
+            Tìm hiểu về thanh toán & API Key
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   const selectedContractName = CONTRACT_TYPES.find(c => c.id === selectedContractId)?.name || 'Chi tiết Hợp đồng';
 
@@ -199,15 +258,15 @@ const App: React.FC = () => {
           </header>
 
           <main className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl shadow-slate-950/50 border border-slate-700">
-             <div className="flex p-2 bg-slate-900/40 rounded-t-2xl border-b border-slate-700">
-                <button onClick={() => setActiveTab('analyze')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 ${getTabStyle('analyze')}`}>
-                  Phân tích File Đơn
+             <div className="flex p-2 bg-slate-900/40 rounded-t-2xl border-b border-slate-700 overflow-x-auto">
+                <button onClick={() => setActiveTab('analyze')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap min-w-[120px] ${getTabStyle('analyze')}`}>
+                  Phân tích File
                 </button>
-                <button onClick={() => setActiveTab('compare')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 ${getTabStyle('compare')}`}>
+                <button onClick={() => setActiveTab('compare')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap min-w-[120px] ${getTabStyle('compare')}`}>
                   So sánh 2 File
                 </button>
-                <button onClick={() => setActiveTab('ocr')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 ${getTabStyle('ocr')}`}>
-                  Nhận dạng ký tự (OCR)
+                <button onClick={() => setActiveTab('ocr')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap min-w-[120px] ${getTabStyle('ocr')}`}>
+                  OCR (Ảnh/PDF)
                 </button>
              </div>
 
@@ -258,9 +317,9 @@ const App: React.FC = () => {
                       <button
                         onClick={handleCompare}
                         disabled={!file1 || !file2 || isComparing}
-                        className="w-full sm:w-auto px-10 py-3 text-base font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 disabled:bg-slate-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-colors duration-300"
+                        className="w-full sm:w-auto px-10 py-3 text-base font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors duration-300"
                       >
-                        {isComparing ? 'Đang so sánh...' : 'So sánh'}
+                        {isComparing ? 'Đang xử lý...' : 'Bắt đầu so sánh'}
                       </button>
                    </div>
                    {comparisonError && (
@@ -280,9 +339,9 @@ const App: React.FC = () => {
 
             {activeTab === 'ocr' && (
               <div className="p-6 sm:p-8">
-                <h2 className="text-2xl font-semibold mb-4 text-center text-slate-100">Trích xuất văn bản từ Ảnh &amp; PDF được quét (OCR)</h2>
+                <h2 className="text-2xl font-semibold mb-4 text-center text-slate-100">OCR - Trích xuất văn bản</h2>
                 <p className="text-center text-slate-400 mb-6 max-w-2xl mx-auto">
-                  Công cụ này sử dụng công nghệ Nhận dạng Ký tự Quang học (OCR) để "đọc" và trích xuất văn bản từ các tệp ảnh (PNG, JPG) hoặc các tệp PDF không thể sao chép văn bản (tài liệu được quét). Hoàn hảo để số hóa tài liệu giấy.
+                  Số hóa tài liệu giấy từ ảnh (PNG, JPG) hoặc PDF quét.
                 </p>
                 <div className="max-w-xl mx-auto">
                     <FileDropzone file={ocrFile} onFileSelect={setOcrFile} title="Tải ảnh hoặc PDF lên" acceptedFormats="ocr" />
@@ -291,9 +350,9 @@ const App: React.FC = () => {
                     <button
                         onClick={handlePerformOcr}
                         disabled={!ocrFile || isOcrLoading}
-                        className="w-full sm:w-auto px-10 py-3 text-base font-semibold text-white bg-teal-600 rounded-lg shadow-md hover:bg-teal-700 disabled:bg-slate-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-colors duration-300"
+                        className="w-full sm:w-auto px-10 py-3 text-base font-semibold text-white bg-teal-600 rounded-lg shadow-md hover:bg-teal-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors duration-300"
                     >
-                        {isOcrLoading ? 'Đang nhận dạng...' : 'Trích xuất văn bản'}
+                        {isOcrLoading ? 'Đang xử lý...' : 'Trích xuất văn bản'}
                     </button>
                 </div>
                 {ocrError && (
@@ -304,18 +363,16 @@ const App: React.FC = () => {
                 {isOcrLoading && <Loader message={loadingMessage} />}
                 {ocrResult && !isOcrLoading && (
                     <div className="mt-8">
-                        <h3 className="text-xl font-semibold mb-4 text-slate-100">Văn bản đã nhận dạng:</h3>
+                        <h3 className="text-xl font-semibold mb-4 text-slate-100">Văn bản nhận diện:</h3>
                         <div className="relative">
                             <textarea
                                 readOnly
                                 value={ocrResult}
-                                className="w-full h-64 p-4 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:ring-sky-500 focus:border-sky-500 font-mono"
-                                aria-label="Văn bản đã nhận dạng"
+                                className="w-full h-64 p-4 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono"
                             />
                             <button
                                 onClick={() => navigator.clipboard.writeText(ocrResult)}
-                                className="absolute top-3 right-3 px-3 py-1 text-xs font-semibold text-sky-200 bg-sky-800/70 rounded-md hover:bg-sky-700 transition-colors"
-                                title="Sao chép vào clipboard"
+                                className="absolute top-3 right-3 px-3 py-1 text-xs font-semibold text-sky-200 bg-sky-800/70 rounded-md hover:bg-sky-700"
                             >
                                 Sao chép
                             </button>
@@ -328,7 +385,7 @@ const App: React.FC = () => {
 
           <footer className="text-center mt-8 text-slate-500 text-sm">
             <p>
-              Cung cấp bởi AI <span className="text-red-700 font-bold">(DI-IT)</span>. Phân tích AI lấy từ nguồn API cổng thông tin Quốc Gia.
+              Cung cấp bởi AI <span className="text-red-700 font-bold">(DI-IT)</span>. Dữ liệu huấn luyện từ Cổng thông tin Pháp luật Quốc gia.
             </p>
           </footer>
         </div>
