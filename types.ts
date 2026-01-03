@@ -1,3 +1,4 @@
+
 export interface GroundingChunk {
   web: {
     uri: string;
@@ -58,6 +59,7 @@ export interface SimilarityMatch {
 export interface ComparisonResult {
   similarityScore: number; // Percentage from 0 to 100
   matches: SimilarityMatch[];
+  sources?: GroundingChunk[];
 }
 
 export interface OcrResult {

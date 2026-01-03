@@ -14,14 +14,13 @@ import ComparisonDisplay from './components/ComparisonDisplay.tsx';
 
 // Khai báo kiểu cho window.aistudio
 declare global {
-  /* Fix: Explicitly define AIStudio interface to ensure compatibility with environmental types */
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
 
   interface Window {
-    /* Fix: Restore 'readonly' modifier to match ambient declaration requirements and resolve "identical modifiers" error */
+    // FIX: Sử dụng readonly để tránh xung đột với các khai báo khác trong môi trường
     readonly aistudio: AIStudio;
   }
 }
@@ -30,7 +29,7 @@ type ActiveTab = 'analyze' | 'compare' | 'ocr';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('analyze');
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Giả định là có cho đến khi kiểm tra
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true); 
 
   // Kiểm tra API Key khi khởi chạy
   useEffect(() => {
@@ -46,18 +45,17 @@ const App: React.FC = () => {
   const handleOpenSelectKey = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      setHasApiKey(true); // Giả định thành công sau khi mở hộp thoại
+      // Giả định chọn key thành công theo hướng dẫn của SDK
+      setHasApiKey(true);
     }
   };
   
-  // === TABS STYLES ===
   const getTabStyle = (tabName: ActiveTab) => {
     return activeTab === tabName
       ? 'bg-sky-600 text-white shadow-md'
       : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50';
   };
 
-  // === SINGLE FILE ANALYSIS STATE ===
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
@@ -71,14 +69,12 @@ const App: React.FC = () => {
   const [modalError, setModalError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   
-  // === DOCUMENT COMPARISON STATE ===
   const [file1, setFile1] = useState<File | null>(null);
   const [file2, setFile2] = useState<File | null>(null);
   const [isComparing, setIsComparing] = useState<boolean>(false);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
 
-  // === OCR STATE ===
   const [ocrFile, setOcrFile] = useState<File | null>(null);
   const [isOcrLoading, setIsOcrLoading] = useState<boolean>(false);
   const [ocrResult, setOcrResult] = useState<string | null>(null);
@@ -86,9 +82,15 @@ const App: React.FC = () => {
 
   const handleError = (err: any, setter: (msg: string) => void) => {
     const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("Requested entity was not found") || msg.includes("API Key")) {
+    // FIX: Bổ sung kiểm tra "requested entity was not found" để yêu cầu người dùng chọn lại API Key
+    const isKeyError = msg.toLowerCase().includes("api key") || 
+                       msg.toLowerCase().includes("unauthorized") || 
+                       msg.toLowerCase().includes("not be set") ||
+                       msg.toLowerCase().includes("requested entity was not found");
+
+    if (isKeyError) {
       setHasApiKey(false);
-      setter("Lỗi: API Key không hợp lệ hoặc chưa được cấu hình. Vui lòng chọn lại Key trả phí.");
+      setter("Lỗi: API Key không hợp lệ hoặc chưa được chọn. Vui lòng bấm 'Chọn API Key' để tiếp tục.");
     } else {
       setter(`Lỗi: ${msg}`);
     }
@@ -107,20 +109,16 @@ const App: React.FC = () => {
       return;
     }
     setIsLoading(true);
-    setLoadingMessage('Đang tải tệp lên và phân tích...');
+    setLoadingMessage('Đang phân tích chính tả...');
     setError(null);
-    setSpellCheckResult(null);
-
     try {
       const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
-      const contractName = selectedContract ? selectedContract.name : CONTRACT_TYPES[0].name;
-      const result = await checkVietnameseSpelling(file, contractName);
+      const result = await checkVietnameseSpelling(file, selectedContract?.name || 'Chung');
       setSpellCheckResult(result);
     } catch (err) {
       handleError(err, setError);
     } finally {
       setIsLoading(false);
-      setLoadingMessage('');
     }
   }, [file, selectedContractId]);
   
@@ -130,32 +128,25 @@ const App: React.FC = () => {
       return;
     }
     setIsEvaluating(true);
-    setLoadingMessage('Đang tải tệp lên và phân tích rủi ro...');
+    setLoadingMessage('Đang phân tích rủi ro pháp lý...');
     setError(null);
-    setLegalResult(null);
-
     try {
         const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
-        const contractName = selectedContract ? selectedContract.name : CONTRACT_TYPES[0].name;
-        const result = await evaluateContractLegality(file, contractName);
+        const result = await evaluateContractLegality(file, selectedContract?.name || 'Chung');
         setLegalResult(result);
     } catch (err) {
         handleError(err, setError);
     } finally {
         setIsEvaluating(false);
-        setLoadingMessage('');
     }
   }, [file, selectedContractId]);
   
   const handleViewDetails = useCallback(async () => {
     const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
     if (!selectedContract || selectedContract.id === 'general') return;
-
     setIsModalOpen(true);
     setIsModalLoading(true);
     setModalError(null);
-    setModalContent(null);
-
     try {
       const details = await getContractDetails(selectedContract.name);
       setModalContent(details);
@@ -166,20 +157,10 @@ const App: React.FC = () => {
     }
   }, [selectedContractId]);
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-  
   const handleCompare = useCallback(async () => {
-      if (!file1 || !file2) {
-        setComparisonError("Vui lòng tải lên cả hai tệp để so sánh.");
-        return;
-      }
-      setComparisonError(null);
-      setComparisonResult(null);
+      if (!file1 || !file2) return;
       setIsComparing(true);
-      setLoadingMessage("Đang so sánh hai văn bản...");
-      
+      setLoadingMessage("Đang so sánh...");
       try {
         const result = await compareDocuments(file1, file2);
         setComparisonResult(result);
@@ -187,20 +168,12 @@ const App: React.FC = () => {
         handleError(err, setComparisonError);
       } finally {
         setIsComparing(false);
-        setLoadingMessage('');
       }
   }, [file1, file2]);
 
   const handlePerformOcr = useCallback(async () => {
-      if (!ocrFile) {
-          setOcrError("Vui lòng chọn một tệp ảnh hoặc PDF.");
-          return;
-      }
-      setOcrError(null);
-      setOcrResult(null);
+      if (!ocrFile) return;
       setIsOcrLoading(true);
-      setLoadingMessage('Đang thực hiện nhận dạng ký tự...');
-
       try {
           const result = await performOcr(ocrFile);
           setOcrResult(result.text);
@@ -208,197 +181,81 @@ const App: React.FC = () => {
           handleError(err, setOcrError);
       } finally {
           setIsOcrLoading(false);
-          setLoadingMessage('');
       }
   }, [ocrFile]);
 
-  if (!hasApiKey && window.aistudio) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-        <div className="max-w-md w-full bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl text-center">
-          <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-4">Yêu cầu API Key</h2>
-          <p className="text-slate-400 mb-6">
-            Ứng dụng yêu cầu API Key trả phí từ Google Cloud để sử dụng các mô hình AI cao cấp. Vui lòng chọn Key của bạn để tiếp tục.
-          </p>
-          <button
-            onClick={handleOpenSelectKey}
-            className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg transition-colors mb-4"
-          >
-            Chọn API Key
-          </button>
-          <a 
-            href="https://ai.google.dev/gemini-api/docs/billing" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sky-400 hover:underline text-sm"
-          >
-            Tìm hiểu về thanh toán & API Key
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const selectedContractName = CONTRACT_TYPES.find(c => c.id === selectedContractId)?.name || 'Chi tiết Hợp đồng';
-
   return (
-    <>
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 font-sans">
-        <div className="w-full max-w-4xl mx-auto">
-          <header className="text-center mb-8">
-            <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">
-              Trợ lý Pháp lý AI
-            </h1>
-            <p className="mt-3 text-lg text-slate-400">
-              Phân tích, đánh giá, so sánh hợp đồng và các tài liệu pháp lý.
-            </p>
-          </header>
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col p-4 sm:p-8">
+      <div className="max-w-4xl mx-auto w-full">
+        <header className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-sky-400 mb-2">Trợ lý Pháp lý AI</h1>
+          <p className="text-slate-400">Hỗ trợ kiểm tra chính tả, rủi ro pháp lý và OCR văn bản Tiếng Việt.</p>
+        </header>
 
-          <main className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl shadow-slate-950/50 border border-slate-700">
-             <div className="flex p-2 bg-slate-900/40 rounded-t-2xl border-b border-slate-700 overflow-x-auto">
-                <button onClick={() => setActiveTab('analyze')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap min-w-[120px] ${getTabStyle('analyze')}`}>
-                  Phân tích File
-                </button>
-                <button onClick={() => setActiveTab('compare')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap min-w-[120px] ${getTabStyle('compare')}`}>
-                  So sánh 2 File
-                </button>
-                <button onClick={() => setActiveTab('ocr')} className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap min-w-[120px] ${getTabStyle('ocr')}`}>
-                  OCR (Ảnh/PDF)
-                </button>
-             </div>
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-xl overflow-hidden mb-8">
+          {/* Cảnh báo API Key */}
+          {!hasApiKey && (
+            <div className="bg-amber-900/40 border-b border-amber-700 p-4 text-center">
+              <p className="text-amber-200 mb-3">Vui lòng xác thực API Key trả phí của bạn để tiếp tục sử dụng. (Xem hướng dẫn: ai.google.dev/gemini-api/docs/billing)</p>
+              <button 
+                onClick={handleOpenSelectKey}
+                className="bg-amber-600 hover:bg-amber-500 text-white px-6 py-2 rounded-lg font-bold transition-colors"
+              >
+                Chọn API Key
+              </button>
+            </div>
+          )}
 
+          <div className="flex bg-slate-900/50 border-b border-slate-700">
+            <button onClick={() => setActiveTab('analyze')} className={`flex-1 py-4 font-bold ${activeTab === 'analyze' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-500'}`}>Phân tích File</button>
+            <button onClick={() => setActiveTab('compare')} className={`flex-1 py-4 font-bold ${activeTab === 'compare' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-500'}`}>So sánh 2 File</button>
+            <button onClick={() => setActiveTab('ocr')} className={`flex-1 py-4 font-bold ${activeTab === 'ocr' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-500'}`}>OCR</button>
+          </div>
+
+          <div className="p-6">
             {activeTab === 'analyze' && (
-              <div className="p-6 sm:p-8">
-                <ContractTypeSelector
-                  selectedType={selectedContractId}
-                  onTypeChange={setSelectedContractId}
-                  contractTypes={CONTRACT_TYPES}
-                  onViewDetails={handleViewDetails}
-                />
-                <FileUpload
-                  file={file}
-                  onFileSelect={handleFileSelect}
-                  onCheck={handleCheckSpelling}
-                  onEvaluate={handleEvaluateLegality}
-                  isLoading={isLoading}
-                  isEvaluating={isEvaluating}
-                />
-                {error && (
-                  <div className="mt-6 p-4 bg-red-900/50 text-red-300 border border-red-700 rounded-lg text-center">
-                    {error}
-                  </div>
-                )}
+              <>
+                <ContractTypeSelector selectedType={selectedContractId} onTypeChange={setSelectedContractId} contractTypes={CONTRACT_TYPES} onViewDetails={handleViewDetails} />
+                <FileUpload file={file} onFileSelect={handleFileSelect} onCheck={handleCheckSpelling} onEvaluate={handleEvaluateLegality} isLoading={isLoading} isEvaluating={isEvaluating} />
+                {error && <div className="mt-6 p-4 bg-red-900/50 border border-red-700 rounded-xl text-red-200 text-center">{error}</div>}
                 {(isLoading || isEvaluating) && <Loader message={loadingMessage}/>}
-                {spellCheckResult && !isLoading && (
-                  <div className="mt-8">
-                    <h2 className="text-2xl font-semibold mb-4 text-slate-100 border-b border-slate-700 pb-2">Kết quả phân tích Chính tả & Thể thức</h2>
-                    <ResultsDisplay result={spellCheckResult} />
-                  </div>
-                )}
-                {legalResult && !isEvaluating && (
-                  <div className="mt-8">
-                    <h2 className="text-2xl font-semibold mb-4 text-slate-100 border-b border-slate-700 pb-2">Kết quả Phân tích Lỗ hổng Pháp lý</h2>
-                    <LegalEvaluationDisplay result={legalResult} />
-                  </div>
-                )}
-              </div>
+                {spellCheckResult && !isLoading && <ResultsDisplay result={spellCheckResult} />}
+                {legalResult && !isEvaluating && <LegalEvaluationDisplay result={legalResult} />}
+              </>
             )}
-            
+
             {activeTab === 'compare' && (
-               <div className="p-6 sm:p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <FileDropzone file={file1} onFileSelect={setFile1} title="Tài liệu 1" acceptedFormats="documents" />
-                    <FileDropzone file={file2} onFileSelect={setFile2} title="Tài liệu 2" acceptedFormats="documents" />
-                  </div>
-                   <div className="flex justify-center">
-                      <button
-                        onClick={handleCompare}
-                        disabled={!file1 || !file2 || isComparing}
-                        className="w-full sm:w-auto px-10 py-3 text-base font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors duration-300"
-                      >
-                        {isComparing ? 'Đang xử lý...' : 'Bắt đầu so sánh'}
-                      </button>
-                   </div>
-                   {comparisonError && (
-                      <div className="mt-6 p-4 bg-red-900/50 text-red-300 border border-red-700 rounded-lg text-center">
-                          {comparisonError}
-                      </div>
-                   )}
-                   {isComparing && <Loader message={loadingMessage}/>}
-                   {comparisonResult && !isComparing && (
-                      <div className="mt-8">
-                        <h2 className="text-2xl font-semibold mb-4 text-slate-100 border-b border-slate-700 pb-2">Kết quả So sánh</h2>
-                        <ComparisonDisplay result={comparisonResult}/>
-                      </div>
-                   )}
-               </div>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FileDropzone file={file1} onFileSelect={setFile1} title="Tài liệu 1" />
+                  <FileDropzone file={file2} onFileSelect={setFile2} title="Tài liệu 2" />
+                </div>
+                <button onClick={handleCompare} disabled={!file1 || !file2 || isComparing} className="w-full py-3 bg-sky-600 hover:bg-sky-500 rounded-xl font-bold disabled:opacity-50 transition-colors">Bắt đầu so sánh</button>
+                {isComparing && <Loader message={loadingMessage}/>}
+                {comparisonResult && <ComparisonDisplay result={comparisonResult}/>}
+                {comparisonError && <div className="mt-6 p-4 bg-red-900/50 border border-red-700 rounded-xl text-red-200 text-center">{comparisonError}</div>}
+              </div>
             )}
 
             {activeTab === 'ocr' && (
-              <div className="p-6 sm:p-8">
-                <h2 className="text-2xl font-semibold mb-4 text-center text-slate-100">OCR - Trích xuất văn bản</h2>
-                <p className="text-center text-slate-400 mb-6 max-w-2xl mx-auto">
-                  Số hóa tài liệu giấy từ ảnh (PNG, JPG) hoặc PDF quét.
-                </p>
-                <div className="max-w-xl mx-auto">
-                    <FileDropzone file={ocrFile} onFileSelect={setOcrFile} title="Tải ảnh hoặc PDF lên" acceptedFormats="ocr" />
-                </div>
-                <div className="flex justify-center mt-6">
-                    <button
-                        onClick={handlePerformOcr}
-                        disabled={!ocrFile || isOcrLoading}
-                        className="w-full sm:w-auto px-10 py-3 text-base font-semibold text-white bg-teal-600 rounded-lg shadow-md hover:bg-teal-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors duration-300"
-                    >
-                        {isOcrLoading ? 'Đang xử lý...' : 'Trích xuất văn bản'}
-                    </button>
-                </div>
-                {ocrError && (
-                    <div className="mt-6 p-4 bg-red-900/50 text-red-300 border border-red-700 rounded-lg text-center">
-                        {ocrError}
-                    </div>
-                )}
-                {isOcrLoading && <Loader message={loadingMessage} />}
-                {ocrResult && !isOcrLoading && (
-                    <div className="mt-8">
-                        <h3 className="text-xl font-semibold mb-4 text-slate-100">Văn bản nhận diện:</h3>
-                        <div className="relative">
-                            <textarea
-                                readOnly
-                                value={ocrResult}
-                                className="w-full h-64 p-4 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono"
-                            />
-                            <button
-                                onClick={() => navigator.clipboard.writeText(ocrResult)}
-                                className="absolute top-3 right-3 px-3 py-1 text-xs font-semibold text-sky-200 bg-sky-800/70 rounded-md hover:bg-sky-700"
-                            >
-                                Sao chép
-                            </button>
-                        </div>
-                    </div>
-                )}
+              <div className="space-y-6">
+                <FileDropzone file={ocrFile} onFileSelect={setOcrFile} title="Tải ảnh/PDF quét" acceptedFormats="ocr" />
+                <button onClick={handlePerformOcr} disabled={!ocrFile || isOcrLoading} className="w-full py-3 bg-teal-600 hover:bg-teal-500 rounded-xl font-bold disabled:opacity-50 transition-colors">Trích xuất văn bản</button>
+                {isOcrLoading && <Loader message="Đang nhận dạng văn bản..."/>}
+                {ocrResult && <div className="p-4 bg-slate-900 border border-slate-700 rounded-xl font-mono text-sm h-64 overflow-y-auto whitespace-pre-wrap">{ocrResult}</div>}
+                {ocrError && <div className="mt-6 p-4 bg-red-900/50 border border-red-700 rounded-xl text-red-200 text-center">{ocrError}</div>}
               </div>
             )}
-          </main>
-
-          <footer className="text-center mt-8 text-slate-500 text-sm">
-            <p>
-              Cung cấp bởi AI <span className="text-red-700 font-bold">(DI-IT)</span>. Dữ liệu huấn luyện từ Cổng thông tin Pháp luật Quốc gia.
-            </p>
-          </footer>
+          </div>
         </div>
+
+        <footer className="text-center text-slate-500 text-sm">
+          <p>Cung cấp bởi AI <span className="text-red-700 font-bold">(DI-IT)</span>. Phân tích dựa trên các quy định pháp luật hiện hành.</p>
+        </footer>
       </div>
-      <ContractDetailsModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        title={selectedContractName}
-        content={modalContent}
-        isLoading={isModalLoading}
-        error={modalError}
-      />
-    </>
+
+      <ContractDetailsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={CONTRACT_TYPES.find(c => c.id === selectedContractId)?.name || ''} content={modalContent} isLoading={isModalLoading} error={modalError} />
+    </div>
   );
 };
 

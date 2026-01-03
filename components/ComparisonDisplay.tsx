@@ -1,6 +1,7 @@
 
 import React from 'react';
 import type { ComparisonResult } from '../types.ts';
+import { SourcesDisplay } from './ResultsDisplay.tsx';
 
 const SimilarityScore: React.FC<{ score: number }> = ({ score }) => {
   const getScoreColor = (s: number) => {
@@ -55,6 +56,9 @@ const ComparisonDisplay: React.FC<{ result: ComparisonResult }> = ({ result }) =
           </div>
         )}
       </div>
+
+      {/* FIX: Hiển thị nguồn tham khảo cho kết quả so sánh */}
+      <SourcesDisplay sources={result.sources} />
     </div>
   );
 };

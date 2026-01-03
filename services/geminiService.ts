@@ -1,15 +1,19 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, ComparisonResult, OcrResult } from '../types';
 import { readFileContent } from '../utils/fileReader';
 
 /**
  * Khởi tạo AI Client.
- * API Key được lấy trực tiếp từ process.env.API_KEY theo quy định của SDK.
+ * API Key được lấy trực tiếp từ process.env.API_KEY.
+ * Khởi tạo instance mới mỗi khi gọi để đảm bảo sử dụng key mới nhất.
  */
 const createAiClient = () => {
   const apiKey = process.env.API_KEY;
-  // Trong môi trường trình duyệt của AI Studio, process.env.API_KEY sẽ được chèn tự động khi build.
-  return new GoogleGenAI({ apiKey: apiKey as string });
+  if (!apiKey || apiKey === "__API_KEY__") {
+    throw new Error("API Key chưa được thiết lập hoặc đang chờ xác thực.");
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 const safeJsonParse = (text: string | undefined) => {
@@ -33,6 +37,8 @@ export const checkVietnameseSpelling = async (file: File, contractName: string):
     model: 'gemini-3-flash-preview',
     contents: `Bạn là trợ lý pháp lý Việt Nam. Kiểm tra chính tả và thể thức văn bản cho: ${contractName}.\n\nNội dung:\n${text}`,
     config: { 
+      // FIX: Thêm googleSearch để kiểm tra các quy định mới nhất về thể thức văn bản hành chính
+      tools: [{googleSearch: {}}],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -64,7 +70,13 @@ export const checkVietnameseSpelling = async (file: File, contractName: string):
       }
     }
   });
-  return safeJsonParse(response.text);
+  
+  const result = safeJsonParse(response.text);
+  // FIX: Trích xuất nguồn tham khảo từ googleSearch
+  return {
+    ...result,
+    sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks
+  };
 };
 
 export const evaluateContractLegality = async (file: File, contractName: string): Promise<LegalEvaluationResult> => {
@@ -72,8 +84,10 @@ export const evaluateContractLegality = async (file: File, contractName: string)
   const ai = createAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: `Bạn là luật sư chuyên gia. Phân tích rủi ro pháp lý và lỗ hổng hợp đồng cho: ${contractName}. Đưa ra khuyến nghị chi tiết.\n\nNội dung:\n${text}`,
+    contents: `Bạn là luật sư chuyên gia. Phân tích rủi ro pháp lý và lỗ hổng hợp đồng cho: ${contractName} dựa trên Bộ luật Dân sự 2015 và các văn bản luật liên quan mới nhất. Đưa ra khuyến nghị chi tiết.\n\nNội dung:\n${text}`,
     config: { 
+      // FIX: Thêm googleSearch để đối chiếu với các thông tư, nghị định mới nhất
+      tools: [{googleSearch: {}}],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -95,16 +109,30 @@ export const evaluateContractLegality = async (file: File, contractName: string)
       }
     }
   });
-  return safeJsonParse(response.text);
+  
+  const result = safeJsonParse(response.text);
+  // FIX: Trích xuất nguồn tham khảo từ googleSearch
+  return {
+    ...result,
+    sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks
+  };
 };
 
 export const getContractDetails = async (contractName: string): Promise<ContractDetails> => {
   const ai = createAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Cung cấp chi tiết các quy định pháp luật hiện hành và các điều khoản mẫu bắt buộc cho: ${contractName}`
+    contents: `Cung cấp chi tiết các quy định pháp luật hiện hành và các điều khoản mẫu bắt buộc cho: ${contractName}. Đảm bảo các thông tin cập nhật đến năm 2024-2025.`,
+    config: {
+      // FIX: Thêm googleSearch để tìm kiếm quy định pháp luật mới nhất
+      tools: [{googleSearch: {}}]
+    }
   });
-  return { details: response.text || "Không có dữ liệu chi tiết." };
+  return { 
+    details: response.text || "Không có dữ liệu chi tiết.",
+    // FIX: Trích xuất nguồn tham khảo từ googleSearch
+    sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks
+  };
 };
 
 export const compareDocuments = async (file1: File, file2: File): Promise<ComparisonResult> => {
@@ -113,8 +141,10 @@ export const compareDocuments = async (file1: File, file2: File): Promise<Compar
   const ai = createAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `So sánh hai văn bản sau để tìm điểm tương đồng và khác biệt chính:\n\nVăn bản 1: ${text1}\n\nVăn bản 2: ${text2}`,
+    contents: `So sánh hai văn bản sau để tìm điểm tương đồng và khác biệt chính về nội dung pháp lý:\n\nVăn bản 1: ${text1}\n\nVăn bản 2: ${text2}`,
     config: { 
+      // FIX: Thêm googleSearch để đối chiếu với các mẫu văn bản chuẩn trên web
+      tools: [{googleSearch: {}}],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -134,10 +164,17 @@ export const compareDocuments = async (file1: File, file2: File): Promise<Compar
       }
     }
   });
-  return safeJsonParse(response.text);
+  
+  const result = safeJsonParse(response.text);
+  // FIX: Trích xuất nguồn tham khảo từ googleSearch
+  return {
+    ...result,
+    sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks
+  };
 };
 
 export const performOcr = async (file: File): Promise<OcrResult> => {
+  // Sử dụng reader có sẵn hỗ trợ PDF/Docx và Tesseract cho hình ảnh
   const text = await readFileContent(file);
   return { text };
 };
