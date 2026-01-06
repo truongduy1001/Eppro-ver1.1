@@ -36,7 +36,6 @@ export interface ContractDetails {
   sources?: GroundingChunk[];
 }
 
-// Types for Legal Evaluation
 export interface LegalFeedbackItem {
   type: 'suggestion' | 'warning' | 'critical';
   clause: string;
@@ -50,15 +49,23 @@ export interface LegalEvaluationResult {
   sources?: GroundingChunk[];
 }
 
-// Types for Document Comparison
-export interface SimilarityMatch {
-  textFromFile1: string;
-  textFromFile2: string;
+// Cấu trúc mới cho So sánh chuyên sâu
+export interface ComparisonDifference {
+  clause: string;
+  changeType: 'added' | 'removed' | 'modified' | 'unchanged';
+  text1: string;
+  text2: string;
+  legalImpact: string;
 }
 
 export interface ComparisonResult {
-  similarityScore: number; // Percentage from 0 to 100
-  matches: SimilarityMatch[];
+  summary: string;
+  similarityScore: number;
+  differences: ComparisonDifference[];
+  legalRemarks: string;
+  formalAssessment: string;
+  recommendations: string;
+  bestVersion: 'file1' | 'file2' | 'equal';
   sources?: GroundingChunk[];
 }
 
