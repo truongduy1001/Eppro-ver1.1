@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, ComparisonResult, OcrResult } from '../types';
 import { readFileContent } from '../utils/fileReader';
@@ -23,12 +24,15 @@ const safeJsonParse = (text: string | undefined) => {
   }
 };
 
-export const checkVietnameseSpelling = async (file: File, contractName: string): Promise<SpellCheckResult> => {
+export const checkVietnameseSpelling = async (file: File, contractName: string, lang: 'vi' | 'en' = 'vi'): Promise<SpellCheckResult> => {
   const text = await readFileContent(file);
   const ai = createAiClient();
+  const outputLang = lang === 'vi' ? 'Tiếng Việt' : 'English';
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Bạn là Trợ lý Pháp lý chuyên nghiệp. Hãy kiểm tra chính tả, hành văn và tính trang trọng cho văn bản: ${contractName}.\n\nNội dung:\n${text}`,
+    contents: `Bạn là Trợ lý Pháp lý chuyên nghiệp. Hãy kiểm tra chính tả, hành văn và tính trang trọng cho văn bản: ${contractName}.
+    Hãy phản hồi kết quả bằng ngôn ngữ: ${outputLang}.\n\nNội dung:\n${text}`,
     config: { 
       tools: [{googleSearch: {}}],
       responseMimeType: "application/json",
@@ -66,13 +70,16 @@ export const checkVietnameseSpelling = async (file: File, contractName: string):
   return { ...safeJsonParse(response.text), sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks };
 };
 
-export const evaluateContractLegality = async (file: File, contractName: string): Promise<LegalEvaluationResult> => {
+export const evaluateContractLegality = async (file: File, contractName: string, lang: 'vi' | 'en' = 'vi'): Promise<LegalEvaluationResult> => {
   const text = await readFileContent(file);
   const ai = createAiClient();
+  const outputLang = lang === 'vi' ? 'Tiếng Việt' : 'English';
+
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Bạn là Luật sư cao cấp Việt Nam. Phân tích rủi ro pháp lý cho loại: ${contractName}. 
-    Tập trung vào: Điều khoản mơ hồ, nội dung bất lợi, thiếu căn cứ pháp lý.\n\nNội dung văn bản:\n${text}`,
+    contents: `Bạn là Luật sư cao cấp. Phân tích rủi ro pháp lý cho loại: ${contractName}. 
+    Tập trung vào: Điều khoản mơ hồ, nội dung bất lợi, thiếu căn cứ pháp lý.
+    Hãy phản hồi kết quả bằng ngôn ngữ: ${outputLang}.\n\nNội dung văn bản:\n${text}`,
     config: { 
       tools: [{googleSearch: {}}],
       responseMimeType: "application/json",
@@ -100,13 +107,16 @@ export const evaluateContractLegality = async (file: File, contractName: string)
   return { legalScore: result.legalScore ?? 0, feedback: result.feedback || [], sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks };
 };
 
-export const compareDocuments = async (file1: File, file2: File): Promise<ComparisonResult> => {
+export const compareDocuments = async (file1: File, file2: File, lang: 'vi' | 'en' = 'vi'): Promise<ComparisonResult> => {
   const text1 = await readFileContent(file1);
   const text2 = await readFileContent(file2);
   const ai = createAiClient();
+  const outputLang = lang === 'vi' ? 'Tiếng Việt' : 'English';
+
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Bạn là Luật sư chuyên gia cấp cao. Hãy so sánh chi tiết 2 văn bản dưới đây để CHỌN BẢN AN TOÀN HƠN.
+    Hãy phản hồi kết quả bằng ngôn ngữ: ${outputLang}.
     
     Yêu cầu:
     1. Chỉ ra điểm GIỐNG NHAU.
@@ -158,11 +168,12 @@ export const compareDocuments = async (file1: File, file2: File): Promise<Compar
   };
 };
 
-export const getContractDetails = async (contractName: string): Promise<ContractDetails> => {
+export const getContractDetails = async (contractName: string, lang: 'vi' | 'en' = 'vi'): Promise<ContractDetails> => {
   const ai = createAiClient();
+  const outputLang = lang === 'vi' ? 'Tiếng Việt' : 'English';
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Cung cấp quy định pháp luật và điều khoản bắt buộc cho: ${contractName}.`,
+    contents: `Cung cấp quy định pháp luật và điều khoản bắt buộc cho: ${contractName}. Hãy trình bày bằng: ${outputLang}.`,
     config: { tools: [{googleSearch: {}}] }
   });
   return { details: response.text || "Không có dữ liệu.", sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks };
