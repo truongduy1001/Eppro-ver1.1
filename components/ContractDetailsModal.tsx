@@ -10,6 +10,7 @@ interface ContractDetailsModalProps {
   content: ContractDetails | null;
   isLoading: boolean;
   error: string | null;
+  theme: 'dark' | 'light';
 }
 
 // Helper function to parse inline markdown like **bold**, *italic*, and `code`
@@ -94,7 +95,7 @@ const renderMarkdown = (text: string) => {
 };
 
 
-const ContractDetailsModal: React.FC<ContractDetailsModalProps> = ({ isOpen, onClose, title, content, isLoading, error }) => {
+const ContractDetailsModal: React.FC<ContractDetailsModalProps> = ({ isOpen, onClose, title, content, isLoading, error, theme }) => {
   if (!isOpen) return null;
 
   return (
@@ -106,14 +107,18 @@ const ContractDetailsModal: React.FC<ContractDetailsModalProps> = ({ isOpen, onC
       aria-labelledby="modal-title"
     >
       <div 
-        className="relative w-full max-w-3xl max-h-[90vh] bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl flex flex-col"
+        className={`relative w-full max-w-3xl max-h-[90vh] border rounded-2xl shadow-2xl flex flex-col transition-colors ${
+          theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+        }`}
         onClick={e => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between p-4 border-b border-slate-700 sticky top-0 bg-slate-800/80 backdrop-blur-sm z-10">
-          <h2 id="modal-title" className="text-xl font-semibold text-sky-400">{title}</h2>
+        <header className={`flex items-center justify-between p-4 border-b sticky top-0 backdrop-blur-sm z-10 ${
+          theme === 'dark' ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-white/80'
+        }`}>
+          <h2 id="modal-title" className={`text-xl font-semibold ${theme === 'dark' ? 'text-sky-400' : 'text-indigo-600'}`}>{title}</h2>
           <button 
             onClick={onClose} 
-            className="text-slate-400 hover:text-white transition-colors"
+            className={`${theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'} transition-colors`}
             aria-label="Đóng"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -122,11 +127,13 @@ const ContractDetailsModal: React.FC<ContractDetailsModalProps> = ({ isOpen, onC
           </button>
         </header>
 
-        <main className="overflow-y-auto p-6 text-slate-300">
+        <main className={`overflow-y-auto p-6 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
           {isLoading && (
             <div className="flex flex-col items-center justify-center my-8">
-              <div className="w-10 h-10 border-4 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
-              <p className="mt-4 text-slate-400">Đang tìm kiếm thông tin pháp lý...</p>
+              <div className={`w-10 h-10 border-4 border-t-transparent rounded-full animate-spin ${
+                theme === 'dark' ? 'border-sky-400' : 'border-indigo-600'
+              }`}></div>
+              <p className={`mt-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Đang tìm kiếm thông tin pháp lý...</p>
             </div>
           )}
           {error && (
@@ -135,21 +142,21 @@ const ContractDetailsModal: React.FC<ContractDetailsModalProps> = ({ isOpen, onC
             </div>
           )}
           {content && (
-            <div className="prose prose-invert prose-sm sm:prose-base max-w-none space-y-4">
+            <div className={`prose prose-sm sm:prose-base max-w-none space-y-4 ${theme === 'dark' ? 'prose-invert' : ''}`}>
               <style>{`
-                .prose h1, .prose h2, .prose h3 { color: #38bdf8; border-bottom: 1px solid #475569; padding-bottom: 0.3em; margin-bottom: 0.8em; }
-                .prose h1 { font-size: 1.5em; }
-                .prose h2 { font-size: 1.25em; color: #7dd3fc;}
-                .prose h3 { font-size: 1.1em; color: #a5f3fc;}
-                .prose strong { color: #f1f5f9; }
-                .prose a { color: #38bdf8; text-decoration: none; }
+                .prose h1, .prose h2, .prose h3 { border-bottom: 1px solid ${theme === 'dark' ? '#475569' : '#e2e8f0'}; padding-bottom: 0.3em; margin-bottom: 0.8em; }
+                .prose h1 { font-size: 1.5em; color: ${theme === 'dark' ? '#38bdf8' : '#4f46e5'}; }
+                .prose h2 { font-size: 1.25em; color: ${theme === 'dark' ? '#7dd3fc' : '#6366f1'}; }
+                .prose h3 { font-size: 1.1em; color: ${theme === 'dark' ? '#a5f3fc' : '#818cf8'}; }
+                .prose strong { color: ${theme === 'dark' ? '#f1f5f9' : '#111827'}; }
+                .prose a { color: ${theme === 'dark' ? '#38bdf8' : '#4f46e5'}; text-decoration: none; }
                 .prose a:hover { text-decoration: underline; }
-                .prose ul > li::marker { color: #38bdf8; }
-                .prose ol > li::marker { color: #38bdf8; }
-                .prose p { margin-bottom: 0.5em;}
+                .prose ul > li::marker { color: ${theme === 'dark' ? '#38bdf8' : '#4f46e5'}; }
+                .prose ol > li::marker { color: ${theme === 'dark' ? '#38bdf8' : '#4f46e5'}; }
+                .prose p { margin-bottom: 0.5em; }
               `}</style>
               {renderMarkdown(content.details)}
-              <SourcesDisplay sources={content.sources} />
+              <SourcesDisplay sources={content.sources} theme={theme} />
             </div>
           )}
         </main>

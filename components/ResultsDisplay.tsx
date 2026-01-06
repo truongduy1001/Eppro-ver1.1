@@ -2,8 +2,11 @@
 import React from 'react';
 import type { SpellCheckResult, SpellCheckError, FormatError } from '../types.ts';
 
+// Add missing translations and theme to props interface
 interface ResultsDisplayProps {
   result: SpellCheckResult;
+  translations: any;
+  theme: 'dark' | 'light';
 }
 
 const highlightError = (context: string, incorrectWord: string): React.ReactNode => {
@@ -24,9 +27,11 @@ const highlightError = (context: string, incorrectWord: string): React.ReactNode
 };
 
 
-const ErrorCard: React.FC<{ error: SpellCheckError }> = ({ error }) => {
+const ErrorCard: React.FC<{ error: SpellCheckError, theme: 'dark' | 'light' }> = ({ error, theme }) => {
   return (
-    <div className="bg-slate-800 p-5 rounded-lg border border-slate-700 transform transition-transform duration-300 hover:scale-[1.02] hover:border-sky-600">
+    <div className={`p-5 rounded-lg border transform transition-transform duration-300 hover:scale-[1.02] ${
+      theme === 'dark' ? 'bg-slate-800 border-slate-700 hover:border-sky-600' : 'bg-white border-slate-200 hover:border-indigo-600 shadow-sm'
+    }`}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
         <div className="text-center sm:text-left mb-3 sm:mb-0">
           <p className="text-lg font-semibold text-red-400">{error.incorrectWord}</p>
@@ -35,7 +40,7 @@ const ErrorCard: React.FC<{ error: SpellCheckError }> = ({ error }) => {
           </svg>
           <p className="text-lg font-semibold text-green-400">{error.correctedWord}</p>
         </div>
-        <div className="flex-1 text-slate-300 bg-slate-900/50 p-3 rounded-md">
+        <div className={`flex-1 p-3 rounded-md ${theme === 'dark' ? 'bg-slate-900/50 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
           <span className="text-slate-400 text-sm">Ngữ cảnh: </span>
           <p className="italic">"{highlightError(error.context, error.incorrectWord)}"</p>
         </div>
@@ -44,9 +49,11 @@ const ErrorCard: React.FC<{ error: SpellCheckError }> = ({ error }) => {
   );
 };
 
-const FormatErrorCard: React.FC<{ error: FormatError }> = ({ error }) => {
+const FormatErrorCard: React.FC<{ error: FormatError, theme: 'dark' | 'light' }> = ({ error, theme }) => {
   return (
-    <div className="bg-slate-800 p-5 rounded-lg border border-slate-700 transform transition-transform duration-300 hover:scale-[1.02] hover:border-amber-600">
+    <div className={`p-5 rounded-lg border transform transition-transform duration-300 hover:scale-[1.02] ${
+      theme === 'dark' ? 'bg-slate-800 border-slate-700 hover:border-amber-600' : 'bg-white border-slate-200 hover:border-amber-500 shadow-sm'
+    }`}>
       <div className="flex items-start space-x-4">
         <div className="flex-shrink-0 pt-1">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -55,22 +62,22 @@ const FormatErrorCard: React.FC<{ error: FormatError }> = ({ error }) => {
         </div>
         <div className="flex-1">
           <p className="font-semibold text-amber-400">{error.errorType}</p>
-          <p className="mt-2 text-sm text-slate-300"><strong className="text-slate-400">Mô tả:</strong> {error.description}</p>
-          <p className="mt-1 text-sm text-slate-300"><strong className="text-slate-400">Đề xuất:</strong> <span className="text-green-400">{error.recommendation}</span></p>
+          <p className={`mt-2 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}><strong className="text-slate-400">Mô tả:</strong> {error.description}</p>
+          <p className={`mt-1 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}><strong className="text-slate-400">Đề xuất:</strong> <span className="text-green-400">{error.recommendation}</span></p>
         </div>
       </div>
     </div>
   );
 };
 
-export const SourcesDisplay: React.FC<{ sources: SpellCheckResult['sources'] }> = ({ sources }) => {
+export const SourcesDisplay: React.FC<{ sources: SpellCheckResult['sources'], theme?: 'dark' | 'light' }> = ({ sources, theme = 'dark' }) => {
   if (!sources || sources.length === 0) {
     return null;
   }
 
   return (
-    <div className="mt-8 pt-4 border-t border-slate-700">
-      <h3 className="text-lg font-semibold text-slate-300 mb-3">Nguồn tham khảo:</h3>
+    <div className={`mt-8 pt-4 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+      <h3 className={`text-lg font-semibold mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Nguồn tham khảo:</h3>
       <ul className="list-disc list-inside space-y-2">
         {sources.map((source, index) => (
           <li key={index} className="text-sm">
@@ -78,7 +85,7 @@ export const SourcesDisplay: React.FC<{ sources: SpellCheckResult['sources'] }> 
               href={source.web.uri}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sky-400 hover:text-sky-300 hover:underline"
+              className={`${theme === 'dark' ? 'text-sky-400 hover:text-sky-300' : 'text-indigo-600 hover:text-indigo-500'} hover:underline`}
               title={source.web.title}
             >
               {source.web.title || source.web.uri}
@@ -91,20 +98,23 @@ export const SourcesDisplay: React.FC<{ sources: SpellCheckResult['sources'] }> 
 };
 
 
-const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result }) => {
+const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, translations, theme }) => {
   const hasSpellingErrors = result.errors && result.errors.length > 0;
   const hasFormatErrors = result.formatErrors && result.formatErrors.length > 0;
+  const t = translations;
 
   if (!hasSpellingErrors && !hasFormatErrors) {
     return (
       <>
-        <div className="p-6 bg-green-900/50 text-green-200 border border-green-700 rounded-lg text-center flex items-center justify-center space-x-3">
+        <div className={`p-6 border rounded-lg text-center flex items-center justify-center space-x-3 ${
+          theme === 'dark' ? 'bg-green-900/50 text-green-200 border-green-700' : 'bg-green-50 text-green-700 border-green-200'
+        }`}>
           <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
           <span className="text-lg font-semibold">Tuyệt vời! Không tìm thấy lỗi chính tả hoặc thể thức nào.</span>
         </div>
-        <SourcesDisplay sources={result.sources} />
+        <SourcesDisplay sources={result.sources} theme={theme} />
       </>
     );
   }
@@ -113,7 +123,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result }) => {
 
   return (
     <div>
-      <div className="mb-6 p-4 bg-yellow-900/40 text-yellow-200 border border-yellow-700 rounded-lg">
+      <div className={`mb-6 p-4 border rounded-lg ${
+        theme === 'dark' ? 'bg-yellow-900/40 text-yellow-200 border-yellow-700' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+      }`}>
         <p className="font-semibold">Đã tìm thấy tổng cộng {totalErrors} vấn đề. Vui lòng xem lại các đề xuất dưới đây.</p>
       </div>
 
@@ -127,7 +139,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result }) => {
           </h3>
           <div className="space-y-4">
             {result.errors.map((error, index) => (
-              <ErrorCard key={`spell-${index}`} error={error} />
+              <ErrorCard key={`spell-${index}`} error={error} theme={theme} />
             ))}
           </div>
         </section>
@@ -143,13 +155,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result }) => {
           </h3>
           <div className="space-y-4">
             {result.formatErrors.map((error, index) => (
-              <FormatErrorCard key={`format-${index}`} error={error} />
+              <FormatErrorCard key={`format-${index}`} error={error} theme={theme} />
             ))}
           </div>
         </section>
       )}
       
-      <SourcesDisplay sources={result.sources} />
+      <SourcesDisplay sources={result.sources} theme={theme} />
     </div>
   );
 };

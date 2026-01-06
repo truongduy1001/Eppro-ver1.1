@@ -1,15 +1,19 @@
+
 import React, { useState, useCallback, useRef } from 'react';
 
 interface FileDropzoneProps {
   file: File | null;
   onFileSelect: (file: File | null) => void;
   title: string;
+  theme: 'dark' | 'light';
+  translations: any;
   acceptedFormats?: 'documents' | 'images' | 'ocr';
 }
 
-const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, acceptedFormats = 'documents' }) => {
+const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, theme, translations, acceptedFormats = 'documents' }) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const t = translations;
 
   let accept: string;
   let description: string;
@@ -25,13 +29,13 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, 
       alertMessage = "Chỉ chấp nhận tệp ảnh (.png, .jpg, .gif, .bmp).";
   } else if (acceptedFormats === 'ocr') {
       accept = "image/png,image/jpeg,image/bmp,application/pdf,.png,.jpg,.jpeg,.bmp,.pdf";
-      description = "Hỗ trợ tệp ảnh (.png, .jpg) và .pdf";
+      description = t.uploadSupport || "Hỗ trợ tệp ảnh (.png, .jpg) và .pdf";
       acceptedMimeTypes = ["image/png", "image/jpeg", "image/bmp", "application/pdf"];
       acceptedExtensions = ['.png', '.jpg', '.jpeg', '.bmp', '.pdf'];
       alertMessage = "Chỉ chấp nhận tệp ảnh hoặc tệp .pdf.";
   } else { // documents
       accept = "application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,.docx,.pdf";
-      description = "Hỗ trợ .docx, .pdf";
+      description = t.uploadSupport || "Hỗ trợ .docx, .pdf";
       acceptedMimeTypes = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/pdf"];
       acceptedExtensions = ['.docx', '.pdf'];
       alertMessage = "Chỉ chấp nhận tệp .docx hoặc .pdf.";
@@ -91,14 +95,18 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, 
 
   return (
     <div className="flex flex-col w-full">
-      <h3 className="text-center font-semibold mb-2 text-slate-300">{title}</h3>
+      <h3 className={`text-center font-semibold mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{title}</h3>
       <div
         onClick={handleClick}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        className={`relative w-full p-6 text-center border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${isDragging ? 'border-sky-400 bg-sky-900/30' : 'border-slate-600 hover:border-sky-500 hover:bg-slate-700/50'}`}
+        className={`relative w-full p-6 text-center border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${
+          isDragging 
+            ? (theme === 'dark' ? 'border-sky-400 bg-sky-900/30' : 'border-indigo-400 bg-indigo-50') 
+            : (theme === 'dark' ? 'border-slate-600 hover:border-sky-500 hover:bg-slate-700/50' : 'border-slate-300 hover:border-indigo-500 hover:bg-slate-50')
+        }`}
       >
         <input
           type="file"
@@ -109,21 +117,23 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, 
         />
         {!file ? (
             <div className="flex flex-col items-center justify-center pointer-events-none text-sm">
-                <svg className="w-10 h-10 mb-2 text-slate-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/></svg>
-                <p className="text-slate-400">
-                    <span className="font-semibold text-sky-400">Nhấn để tải lên</span> hoặc thả tệp
+                <svg className={`w-10 h-10 mb-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                </svg>
+                <p className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <span className={`font-semibold ${theme === 'dark' ? 'text-sky-400' : 'text-indigo-600'}`}>{t.uploadTitle}</span> {t.uploadDrag.split(' ').slice(1).join(' ')}
                 </p>
-                 <p className="text-xs text-slate-500 mt-1">{description}</p>
+                 <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{description}</p>
             </div>
         ) : (
-            <div className="text-center text-sm text-slate-300">
+            <div className={`text-center text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                 <p className="font-medium break-all">{file.name}</p>
                  <button 
                     onClick={handleRemoveFile} 
-                    className="mt-2 text-xs text-red-400 hover:text-red-300 hover:underline"
+                    className={`mt-2 text-xs hover:underline ${theme === 'dark' ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-500'}`}
                     aria-label={`Xóa tệp ${file.name}`}
                  >
-                    Xóa tệp
+                    {t.removeFile || 'Xóa tệp'}
                 </button>
             </div>
         )}

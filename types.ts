@@ -49,7 +49,6 @@ export interface LegalEvaluationResult {
   sources?: GroundingChunk[];
 }
 
-// Cấu trúc mới cho So sánh chuyên sâu
 export interface ComparisonDifference {
   clause: string;
   changeType: 'added' | 'removed' | 'modified' | 'unchanged';
@@ -69,7 +68,12 @@ export interface ComparisonResult {
   sources?: GroundingChunk[];
 }
 
+// Cấu trúc OCR mới theo yêu cầu 4 giai đoạn
 export interface OcrResult {
-  text: string;
+  cleanText: string;            // Phần A: Văn bản đã OCR & hiệu chỉnh
+  fixedErrors: string[];        // Phần B: Danh sách lỗi OCR đã sửa
+  checkRequired: string[];      // Phần C: Các đoạn cần kiểm tra lại
+  qualityReport: string;        // Phần D: Nhận xét tổng thể chất lượng
+  confidenceLevel: 'High' | 'Medium' | 'Low';
   sources?: GroundingChunk[];
 }

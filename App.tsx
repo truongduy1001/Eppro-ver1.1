@@ -1,8 +1,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { checkVietnameseSpelling, getContractDetails, evaluateContractLegality, compareDocuments } from './services/geminiService.ts';
+import { checkVietnameseSpelling, getContractDetails, evaluateContractLegality, compareDocuments, performAdvancedOcr } from './services/geminiService.ts';
 import { CONTRACT_TYPES } from './constants.ts';
-import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, ComparisonResult } from './types.ts';
+import type { SpellCheckResult, ContractDetails, LegalEvaluationResult, ComparisonResult, OcrResult } from './types.ts';
 import { translations } from './translations.ts';
 import FileUpload from './components/FileUpload.tsx';
 import FileDropzone from './components/FileDropzone.tsx';
@@ -13,6 +13,7 @@ import ContractDetailsModal from './components/ContractDetailsModal.tsx';
 import LegalEvaluationDisplay from './components/LegalEvaluationDisplay.tsx';
 import ComparisonDisplay from './components/ComparisonDisplay.tsx';
 import SettingsPanel from './components/SettingsPanel.tsx';
+import OcrResultDisplay from './components/OcrResultDisplay.tsx';
 
 type ActiveTab = 'analyze' | 'compare' | 'ocr';
 
@@ -29,6 +30,11 @@ const App: React.FC = () => {
   const [compareFile2, setCompareFile2] = useState<File | null>(null);
   const [isComparing, setIsComparing] = useState<boolean>(false);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
+
+  // State cho OCR
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const [isOcrLoading, setIsOcrLoading] = useState<boolean>(false);
+  const [ocrResult, setOcrResult] = useState<OcrResult | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
@@ -65,7 +71,7 @@ const App: React.FC = () => {
       const result = await checkVietnameseSpelling(file, selectedContract?.name || 'Chung', lang);
       setSpellCheckResult(result);
     } catch (err) { handleError(err, setError); } finally { setIsLoading(false); }
-  }, [file, selectedContractId, lang]);
+  }, [file, selectedContractId, lang, t.errorNoFile]);
   
   const handleEvaluateLegality = useCallback(async () => {
     if (!file) { setError(t.errorNoFile); return; }
@@ -75,7 +81,7 @@ const App: React.FC = () => {
         const result = await evaluateContractLegality(file, selectedContract?.name || 'Chung', lang);
         setLegalResult(result);
     } catch (err) { handleError(err, setError); } finally { setIsEvaluating(false); }
-  }, [file, selectedContractId, lang]);
+  }, [file, selectedContractId, lang, t.errorNoFile]);
 
   const handleStartComparison = useCallback(async () => {
     if (!compareFile1 || !compareFile2) { setError(t.errorNoFiles); return; }
@@ -84,7 +90,16 @@ const App: React.FC = () => {
       const result = await compareDocuments(compareFile1, compareFile2, lang);
       setComparisonResult(result);
     } catch (err) { handleError(err, setError); } finally { setIsComparing(false); }
-  }, [compareFile1, compareFile2, lang]);
+  }, [compareFile1, compareFile2, lang, t.errorNoFiles]);
+
+  const handleStartOcr = useCallback(async () => {
+    if (!ocrFile) { setError(t.errorNoFile); return; }
+    setIsOcrLoading(true); setError(null); setOcrResult(null);
+    try {
+      const result = await performAdvancedOcr(ocrFile, lang);
+      setOcrResult(result);
+    } catch (err) { handleError(err, setError); } finally { setIsOcrLoading(false); }
+  }, [ocrFile, lang, t.errorNoFile]);
 
   const handleViewDetails = useCallback(async () => {
     const selectedContract = CONTRACT_TYPES.find(c => c.id === selectedContractId);
@@ -92,6 +107,7 @@ const App: React.FC = () => {
     setIsModalOpen(true); setIsModalLoading(true); setModalError(null);
     try {
       const details = await getContractDetails(selectedContract.name, lang);
+      details.sources;
       setModalContent(details);
     } catch (err) { handleError(err, setModalError); } finally { setIsModalLoading(false); }
   }, [selectedContractId, lang]);
@@ -202,10 +218,38 @@ const App: React.FC = () => {
             )}
 
             {activeTab === 'ocr' && (
-               <div className={`text-center p-12 italic rounded-xl border border-dashed transition-all ${
-                 theme === 'dark' ? 'text-slate-400 bg-slate-900/20 border-slate-700' : 'text-slate-500 bg-slate-50 border-slate-300'
-               }`}>
-                  {t.ocrInfo}
+               <div className="space-y-8">
+                  <div className={`text-center p-6 italic rounded-xl border border-dashed transition-all ${
+                    theme === 'dark' ? 'text-slate-400 bg-slate-900/20 border-slate-700' : 'text-slate-500 bg-slate-50 border-slate-300'
+                  }`}>
+                      {t.ocrInfo}
+                  </div>
+                  <FileDropzone title="Tài liệu OCR" file={ocrFile} onFileSelect={setOcrFile} theme={theme} translations={t} acceptedFormats="ocr" />
+                  
+                  <div className="flex justify-center">
+                    <button 
+                      onClick={handleStartOcr}
+                      disabled={!ocrFile || isOcrLoading}
+                      className={`px-10 py-4 font-bold rounded-2xl shadow-xl transition-all flex items-center space-x-2 ${
+                        isOcrLoading 
+                          ? 'bg-slate-700 text-slate-400' 
+                          : (theme === 'dark' ? 'bg-sky-500 hover:bg-sky-600 text-white shadow-sky-500/20' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20')
+                      }`}
+                    >
+                      {isOcrLoading ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div><span>{t.ocrProcessing}</span></> : t.btnStartOcr}
+                    </button>
+                  </div>
+
+                  {error && <div className={`p-4 border rounded-xl text-center ${theme === 'dark' ? 'bg-red-900/40 border-red-700 text-red-200' : 'bg-red-50 border-red-200 text-red-600'}`}>{error}</div>}
+                  {isOcrLoading && <Loader message={t.ocrProcessing} theme={theme} />}
+                  {ocrResult && !isOcrLoading && (
+                    <OcrResultDisplay 
+                      result={ocrResult} 
+                      translations={t} 
+                      theme={theme} 
+                      originalFileName={ocrFile?.name || 'document'} 
+                    />
+                  )}
                </div>
             )}
           </div>
