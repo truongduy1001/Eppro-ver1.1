@@ -1,16 +1,26 @@
-
 import React, { useState, useCallback, useRef } from 'react';
 
 interface FileDropzoneProps {
   file: File | null;
   onFileSelect: (file: File | null) => void;
-  title: string;
+  onFilesSelect?: (files: File[]) => void;
+  title: React.ReactNode;
   theme: 'dark' | 'light';
   translations: any;
   acceptedFormats?: 'documents' | 'images' | 'ocr';
+  multiple?: boolean;
 }
 
-const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, theme, translations, acceptedFormats = 'documents' }) => {
+const FileDropzone: React.FC<FileDropzoneProps> = ({ 
+  file, 
+  onFileSelect, 
+  onFilesSelect,
+  title, 
+  theme, 
+  translations, 
+  acceptedFormats = 'documents',
+  multiple = false
+}) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = translations;
@@ -42,8 +52,12 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, 
   }
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      onFileSelect(event.target.files[0]);
+    if (event.target.files && event.target.files.length > 0) {
+      if (multiple && onFilesSelect) {
+        onFilesSelect(Array.from(event.target.files));
+      } else {
+        onFileSelect(event.target.files[0]);
+      }
     }
   };
 
@@ -73,17 +87,25 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, 
     e.stopPropagation();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const droppedFile = e.dataTransfer.files[0];
-      const fileName = droppedFile.name.toLowerCase();
-      
-      if (acceptedMimeTypes.includes(droppedFile.type) || acceptedExtensions.some(ext => fileName.endsWith(ext))) {
-        onFileSelect(droppedFile);
+      // FIX: Explicitly cast dropped files to File[] to avoid 'unknown' type issues when accessing name and type properties
+      const droppedFiles = Array.from(e.dataTransfer.files) as File[];
+      const validFiles = droppedFiles.filter(f => {
+        const fileName = f.name.toLowerCase();
+        return acceptedMimeTypes.includes(f.type) || acceptedExtensions.some(ext => fileName.endsWith(ext));
+      });
+
+      if (validFiles.length > 0) {
+        if (multiple && onFilesSelect) {
+          onFilesSelect(validFiles);
+        } else {
+          onFileSelect(validFiles[0]);
+        }
       } else {
         alert(alertMessage);
       }
       e.dataTransfer.clearData();
     }
-  }, [onFileSelect, acceptedMimeTypes, acceptedExtensions, alertMessage]);
+  }, [onFileSelect, onFilesSelect, multiple, acceptedMimeTypes, acceptedExtensions, alertMessage]);
   
   const handleRemoveFile = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -95,7 +117,13 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, 
 
   return (
     <div className="flex flex-col w-full">
-      <h3 className={`text-center font-semibold mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{title}</h3>
+      <div className="mb-2 text-center">
+        {typeof title === 'string' ? (
+          <h3 className={`font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{title}</h3>
+        ) : (
+          title
+        )}
+      </div>
       <div
         onClick={handleClick}
         onDragEnter={onDragEnter}
@@ -114,6 +142,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ file, onFileSelect, title, 
           onChange={handleFileChange}
           className="hidden"
           accept={accept}
+          multiple={multiple}
         />
         {!file ? (
             <div className="flex flex-col items-center justify-center pointer-events-none text-sm">

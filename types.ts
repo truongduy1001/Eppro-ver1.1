@@ -52,28 +52,23 @@ export interface LegalEvaluationResult {
 export interface ComparisonDifference {
   clause: string;
   changeType: 'added' | 'removed' | 'modified' | 'unchanged';
-  text1: string;
-  text2: string;
-  legalImpact: string;
+  description: string;
+  impact: string;
 }
 
 export interface ComparisonResult {
-  summary: string;
-  similarityScore: number;
-  differences: ComparisonDifference[];
-  legalRemarks: string;
-  formalAssessment: string;
-  recommendations: string;
-  bestVersion: 'file1' | 'file2' | 'equal';
+  summary: string;             // I. Tóm tắt nhanh sự khác biệt chính
+  detailedTable: ComparisonDifference[]; // II. Bảng so sánh chi tiết
+  legalRemarks: string;        // III. Nhận xét pháp lý
+  recommendations: string;     // IV. Đề xuất chỉnh sửa / lưu ý quan trọng
   sources?: GroundingChunk[];
 }
 
-// Cấu trúc OCR mới theo yêu cầu 4 giai đoạn
 export interface OcrResult {
-  cleanText: string;            // Phần A: Văn bản đã OCR & hiệu chỉnh
-  fixedErrors: string[];        // Phần B: Danh sách lỗi OCR đã sửa
-  checkRequired: string[];      // Phần C: Các đoạn cần kiểm tra lại
-  qualityReport: string;        // Phần D: Nhận xét tổng thể chất lượng
+  cleanText: string;
+  fixedErrors: string[];
+  checkRequired: string[];
+  qualityReport: string;
   confidenceLevel: 'High' | 'Medium' | 'Low';
   sources?: GroundingChunk[];
 }
