@@ -7,7 +7,7 @@ interface FileDropzoneProps {
   title: React.ReactNode;
   theme: 'dark' | 'light';
   translations: any;
-  acceptedFormats?: 'documents' | 'images' | 'ocr';
+  acceptedFormats?: 'documents' | 'images' | 'ocr' | 'excel';
   multiple?: boolean;
 }
 
@@ -43,6 +43,12 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       acceptedMimeTypes = ["image/png", "image/jpeg", "image/bmp", "application/pdf"];
       acceptedExtensions = ['.png', '.jpg', '.jpeg', '.bmp', '.pdf'];
       alertMessage = "Chỉ chấp nhận tệp ảnh hoặc tệp .pdf.";
+  } else if (acceptedFormats === 'excel') {
+      accept = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.xlsx,.xls";
+      description = "Hỗ trợ tệp Excel (.xlsx, .xls)";
+      acceptedMimeTypes = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
+      acceptedExtensions = ['.xlsx', '.xls'];
+      alertMessage = "Chỉ chấp nhận tệp Excel (.xlsx, .xls).";
   } else { // documents
       accept = "application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,.docx,.pdf";
       description = t.uploadSupport || "Hỗ trợ .docx, .pdf";

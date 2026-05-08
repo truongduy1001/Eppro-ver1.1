@@ -14,8 +14,12 @@ import LegalEvaluationDisplay from './components/LegalEvaluationDisplay.tsx';
 import ComparisonDisplay from './components/ComparisonDisplay.tsx';
 import SettingsPanel from './components/SettingsPanel.tsx';
 import OcrResultDisplay from './components/OcrResultDisplay.tsx';
+import ExcelCompare from './components/ExcelCompare.tsx';
+import CompanyLookup from './components/CompanyLookup.tsx';
+import VirusTotalScanner from './components/VirusTotalScanner.tsx';
+import VbaUnlocker from './components/VbaUnlocker.tsx';
 
-type ActiveTab = 'analyze' | 'compare' | 'ocr';
+type ActiveTab = 'analyze' | 'compare' | 'ocr' | 'excel' | 'lookup' | 'scanner' | 'vba';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -114,12 +118,12 @@ const App: React.FC = () => {
     }`}>
       <SettingsPanel theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} />
 
-      <div className="max-w-5xl mx-auto w-full pt-12">
+      <div className="max-w-7xl w-full mx-auto pt-12">
         <header className="text-center mb-12">
           <div className="inline-block px-4 py-1.5 mb-6 text-[10px] font-black tracking-[0.2em] uppercase rounded-full border border-sky-500/30 text-sky-400 bg-sky-900/20">
             {t.tagline}
           </div>
-          <h1 className="text-6xl font-black mb-4 tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-sky-400 to-indigo-400">
+          <h1 className="text-6xl font-black mb-4 tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-sky-400 to-indigo-400 pb-2 leading-tight">
             {t.appTitle}
           </h1>
           <p className="text-slate-400 max-w-2xl mx-auto text-lg font-medium">
@@ -127,18 +131,18 @@ const App: React.FC = () => {
           </p>
         </header>
 
-        <nav className={`flex p-1 rounded-3xl mb-10 border transition-all ${theme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200 shadow-lg'}`}>
-          {(['analyze', 'compare', 'ocr'] as ActiveTab[]).map(tab => (
+        <nav className={`flex flex-wrap p-1 rounded-3xl mb-10 border transition-all ${theme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200 shadow-lg'}`}>
+          {(['analyze', 'compare', 'ocr', 'excel', 'lookup', 'scanner', 'vba'] as ActiveTab[]).map(tab => (
             <button 
               key={tab} 
               onClick={() => {setActiveTab(tab); setError(null);}} 
-              className={`flex-1 py-4 px-6 rounded-2xl font-bold uppercase text-xs tracking-widest transition-all ${
+              className={`flex-1 min-w-[120px] py-4 px-2 sm:px-6 rounded-2xl font-bold uppercase text-[10px] sm:text-xs tracking-widest transition-all ${
                 activeTab === tab 
                   ? (theme === 'dark' ? 'text-white bg-sky-600 shadow-xl shadow-sky-900/40' : 'text-white bg-indigo-600 shadow-lg') 
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              {tab === 'analyze' ? t.tabAnalyze : tab === 'compare' ? t.tabCompare : t.tabOcr}
+              {tab === 'analyze' ? t.tabAnalyze : tab === 'compare' ? t.tabCompare : tab === 'ocr' ? t.tabOcr : tab === 'excel' ? t.tabExcel : tab === 'lookup' ? t.tabLookup : tab === 'vba' ? t.tabVba : t.tabScanner}
             </button>
           ))}
         </nav>
@@ -221,6 +225,22 @@ const App: React.FC = () => {
               {isOcrLoading && <Loader message={t.ocrProcessing} theme={theme} />}
               {ocrResult && <OcrResultDisplay result={ocrResult} translations={t} theme={theme} originalFileName={ocrFile?.name || 'ocr'} />}
             </div>
+          )}
+
+          {activeTab === 'excel' && (
+            <ExcelCompare theme={theme} translations={t} />
+          )}
+
+          {activeTab === 'lookup' && (
+            <CompanyLookup theme={theme} />
+          )}
+
+          {activeTab === 'scanner' && (
+            <VirusTotalScanner theme={theme} />
+          )}
+
+          {activeTab === 'vba' && (
+            <VbaUnlocker theme={theme} />
           )}
         </main>
 

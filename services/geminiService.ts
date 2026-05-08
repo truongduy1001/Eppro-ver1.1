@@ -87,7 +87,7 @@ export const compareDocuments = async (files: File[], lang: 'vi' | 'en' = 'vi'):
 
   const allText = contents.join('\n\n');
 
-  const prompt = `Bạn là Trợ lý Pháp lý AI chuyên nghiệp. Hãy thực hiện SO SÁNH CHI TIẾT các tài liệu đã cung cấp.
+  const prompt = `Bạn là Ứng dụng phần mềm tích hợp AI Agent + chuyên nghiệp. Hãy thực hiện SO SÁNH CHI TIẾT các tài liệu đã cung cấp.
 
 === YÊU CẦU SO SÁNH ===
 1. Câu chữ (wording)

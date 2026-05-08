@@ -1,5 +1,6 @@
 {
-  "name": "trolyAIver1.2",
+  "name": "Ứng dụng phần mềm tích hợp AI Agent +",
   "description": "Công cụ thông minh kiểm tra lỗi chính tả, thể thức và lỗ hổng pháp lý trong văn bản Tiếng Việt, hỗ trợ tệp Word, PDF và OCR Chuyên sâu.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }

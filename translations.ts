@@ -1,12 +1,16 @@
 
 export const translations = {
   vi: {
-    appTitle: "Trợ lý Pháp lý AI",
+    appTitle: "Ứng dụng phần mềm tích hợp AI Agent +",
     appSubtitle: "Đối soát rủi ro, so sánh văn bản và chuẩn hóa ngôn ngữ pháp lý thông minh.",
     tagline: "Legal AI Professional",
     tabAnalyze: "Phân tích File",
     tabCompare: "So sánh Văn bản",
     tabOcr: "OCR Chuyên sâu",
+    tabExcel: "So sánh Excel",
+    tabLookup: "Tra cứu Mã số",
+    tabScanner: "Quét File an toàn",
+    tabVba: "Gỡ Pass VBA",
     selectorLabel: "Chọn loại hợp đồng để tăng độ chính xác",
     viewDetails: "Xem Chi tiết",
     uploadTitle: "Nhấn để tải lên",
@@ -56,6 +60,10 @@ export const translations = {
     tabAnalyze: "Analyze File",
     tabCompare: "Document Comparison",
     tabOcr: "Advanced OCR",
+    tabExcel: "Compare Excel",
+    tabLookup: "Company Lookup",
+    tabScanner: "Safe File Scan",
+    tabVba: "Unlock VBA",
     selectorLabel: "Select contract type for higher accuracy",
     viewDetails: "View Details",
     uploadTitle: "Click to upload",
